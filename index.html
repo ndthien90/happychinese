@@ -1,0 +1,2198 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrungPDF Pro v56 - Fix PDF Rendering</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <!-- Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Hanzi Writer Library -->
+    <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7/dist/hanzi-writer.min.js"></script>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+
+    <!-- Dynamic Styles for List Customization -->
+    <style id="dynamic-list-styles">
+        /* Sẽ được JS cập nhật */
+    </style>
+
+    <style>
+        /* Custom Styles */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Font KaiTi cho tiếng Trung */
+        @font-face {
+            font-family: 'Kaiti';
+            src: url('https://ndthien90.github.io/hello_chinese2/fonts/Kaiti.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        .font-kaiti {
+            font-family: "KaiTi", "楷体", "STKaiti", "BiauKai", serif;
+        }
+        .chinese-font { font-family: 'Kaiti', 'Noto Sans SC', sans-serif; }
+
+        .canvas-container { 
+            position: relative; 
+            display: block; 
+            margin: 0 auto;
+            background: white; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); 
+        }
+        
+        #pdf-canvas { display: block; }
+        
+        #overlay { 
+            position: absolute; 
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 50; 
+            touch-action: none; 
+            display: none; 
+            cursor: crosshair;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .selection-box {
+            position: absolute;
+            border: 1px solid #ef4444; 
+            background-color: rgba(239, 68, 68, 0.1);
+            pointer-events: none;
+        }
+
+        /* Smart Trace Highlight */
+        .smart-trace-highlight {
+            animation: pulse-red 2.5s forwards;
+        }
+        @keyframes pulse-red {
+            0% { background-color: rgba(239, 68, 68, 0.5); border-color: #ef4444; transform: scale(1.1); box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+            50% { background-color: rgba(239, 68, 68, 0.1); transform: scale(1); }
+            100% { background-color: transparent; border-color: transparent; }
+        }
+
+        .mode-btn.active {
+            background-color: #ffffff;
+            color: #4f46e5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-weight: 700;
+        }
+        .mode-btn { color: #6b7280; font-weight: 500; }
+
+        @keyframes pulse-bg {
+            0% { background-color: #f3f4f6; }
+            50% { background-color: #e0e7ff; }
+            100% { background-color: #f3f4f6; }
+        }
+        .processing-item { animation: pulse-bg 1.5s infinite; }
+
+        /* Chat Message Styles */
+        .chat-msg-user {
+            background-color: #e0e7ff;
+            color: #3730a3;
+            border-radius: 12px 12px 0 12px;
+            padding: 8px 12px;
+            margin-left: auto;
+            max-width: 85%;
+            width: fit-content;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        .chat-msg-ai {
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px 12px 12px 0;
+            padding: 12px;
+            margin-right: auto;
+            max-width: 95%;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* AI Markdown Styles */
+        .prose p { margin-bottom: 0.5em; }
+        .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.5em; }
+        .prose ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.5em; }
+        .prose strong { color: #4f46e5; font-weight: 700; }
+
+        /* Auth Screen Styles */
+        #auth-screen {
+            background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Flashcard 3D */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        
+        .card-container { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .card-container.flipped { transform: rotateY(180deg); }
+        .btn-press:active { transform: scale(0.95); }
+        
+        /* Custom Checkbox */
+        .custom-checkbox:checked { background-color: #10b981; border-color: #10b981; }
+        .custom-checkbox:checked::after { content: '✔'; display: block; color: white; text-align: center; font-size: 12px; line-height: 20px; }
+
+        /* Quiz Styles */
+        .quiz-option { transition: all 0.2s; }
+        .quiz-option.correct { background-color: #d1fae5 !important; border-color: #10b981 !important; color: #065f46 !important; }
+        .quiz-option.wrong { background-color: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b !important; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Sidebar Tab Styles */
+        .sidebar-tab-active {
+            color: #4f46e5; /* indigo-600 */
+            border-bottom: 2px solid #4f46e5;
+            background-color: #eef2ff; /* indigo-50 */
+        }
+        .bookmark-node { position: relative; }
+        .bookmark-actions { display: none; }
+        .bookmark-row:hover .bookmark-actions { display: flex; }
+        
+        /* Sidebar Transitions */
+        #left-sidebar { transition: width 0.3s ease-in-out, padding 0.3s ease-in-out; }
+
+        /* Tab Styles for Settings Modal */
+        .settings-tab-active {
+            border-bottom: 2px solid #4f46e5;
+            color: #4f46e5;
+            font-weight: bold;
+        }
+
+        /* Drag and Drop Visuals */
+        .bookmark-row.dragging {
+            opacity: 0.5;
+            background-color: #e0e7ff;
+            border: 2px dashed #6366f1;
+        }
+        .bookmark-row.drag-over-top {
+            border-top: 2px solid #4f46e5;
+        }
+        .bookmark-row.drag-over-bottom {
+            border-bottom: 2px solid #4f46e5;
+        }
+        .bookmark-row.drag-over-center {
+            background-color: #dbeafe;
+            border: 2px solid #3b82f6;
+        }
+        .bookmark-active {
+            background-color: #eff6ff !important; /* blue-50 */
+            border-left: 3px solid #3b82f6 !important; /* blue-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col text-gray-800 overflow-hidden">
+
+    <!-- GLOBAL ALERT/CONFIRM MODAL -->
+    <div id="global-alert-modal" class="fixed inset-0 z-[9999] bg-black bg-opacity-60 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-all opacity-0">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 transform transition-all scale-95" id="global-alert-content">
+            <div class="text-center">
+                <div id="global-alert-icon" class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-4">
+                    <i class="fa-solid fa-circle-info text-2xl text-blue-600"></i>
+                </div>
+                <h3 class="text-lg leading-6 font-bold text-gray-900" id="global-alert-title">Thông báo</h3>
+                <div class="mt-2"><p class="text-sm text-gray-500 whitespace-pre-line" id="global-alert-message">Nội dung...</p></div>
+            </div>
+            <div class="mt-6 flex justify-center gap-3" id="global-alert-buttons">
+                <!-- Nút sẽ được render bằng JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- AUTHENTICATION SCREEN -->
+    <div id="auth-screen" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md p-8 rounded-2xl shadow-2xl transform transition-all">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 mb-4 text-3xl shadow-inner">
+                    <i class="fa-solid fa-dragon"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800">开心中文</h1>
+                <p class="text-gray-500 mt-2 text-sm">Học tiếng Trung qua PDF với AI</p>
+            </div>
+            <!-- Login Form -->
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i class="fa-solid fa-envelope"></i></div>
+                        <input type="email" id="login-email" required class="pl-10 block w-full rounded-lg border-gray-300 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 text-sm transition-colors" placeholder="name@example.com">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i class="fa-solid fa-lock"></i></div>
+                        <input type="password" id="login-password" required class="pl-10 block w-full rounded-lg border-gray-300 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 text-sm transition-colors" placeholder="••••••••">
+                    </div>
+                </div>
+                <button type="submit" class="w-full text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 font-bold rounded-lg text-sm px-5 py-3 text-center transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">Đăng nhập</button>
+                <div class="text-center"><span class="text-xs text-gray-400">hoặc</span></div>
+                <button type="button" onclick="handleAnonymousLogin()" class="w-full text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:ring-4 focus:ring-indigo-50 font-bold rounded-lg text-sm px-5 py-3 text-center transition-all"><i class="fa-solid fa-user-secret mr-2"></i>Dùng thử ngay (Khách)</button>
+                <div class="text-sm text-center text-gray-500 mt-2">Chưa có tài khoản? <a href="#" onclick="toggleAuthMode('register')" class="text-indigo-600 hover:underline font-semibold">Tạo tài khoản mới</a></div>
+            </form>
+            <!-- Register Form -->
+            <form id="register-form" class="space-y-4 hidden">
+                <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800 mb-4 flex items-start gap-2"><i class="fa-solid fa-key mt-0.5"></i><span>Bạn cần có mã giới thiệu để đăng ký tài khoản mới.</span></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i class="fa-solid fa-envelope"></i></div>
+                        <input type="email" id="reg-email" required class="pl-10 block w-full rounded-lg border-gray-300 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 text-sm" placeholder="name@example.com">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i class="fa-solid fa-lock"></i></div>
+                        <input type="password" id="reg-password" required class="pl-10 block w-full rounded-lg border-gray-300 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 text-sm" placeholder="••••••••">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mã giới thiệu (Bắt buộc)</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i class="fa-solid fa-ticket"></i></div>
+                        <input type="text" id="reg-code" required class="pl-10 block w-full rounded-lg border-gray-300 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 text-sm" placeholder="Nhập mã giới thiệu">
+                    </div>
+                </div>
+                <button type="submit" class="w-full text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-bold rounded-lg text-sm px-5 py-3 text-center transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">Đăng ký tài khoản</button>
+                <div class="text-sm text-center text-gray-500">Đã có tài khoản? <a href="#" onclick="toggleAuthMode('login')" class="text-indigo-600 hover:underline font-semibold">Đăng nhập ngay</a></div>
+            </form>
+            <div id="auth-message" class="mt-4 text-center text-sm font-medium hidden"></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP HEADER -->
+    <header id="main-header" class="bg-white shadow-sm px-4 py-2 flex items-center justify-between z-10 shrink-0 border-b border-gray-200 hidden relative">
+        <div class="flex items-center gap-3">
+            <button onclick="openLibrary()" class="text-gray-600 hover:text-indigo-600 transition-colors p-1" title="Mở Giá Sách">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+            <div class="flex items-center gap-2">
+                 <img src="https://i.ibb.co/QFtHYYjX/4.png" alt="Panda Logo" style="width: 32px; height: auto;">
+                <div>
+                    <h1 class="text-lg font-bold leading-none text-gray-800">开心中文PDF <span class="text-xs font-normal text-white bg-indigo-600 px-1.5 py-0.5 rounded ml-1">Pro</span></h1>
+                    <p id="current-book-name" class="text-[10px] text-gray-500 font-medium truncate max-w-[120px] sm:max-w-[200px]">Chưa có sách</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTERED ZOOM & NAV CONTROLS -->
+        <div id="zoom-controls-center" class="hidden md:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center bg-gray-100 rounded-lg border border-gray-300 shadow-sm p-0.5 gap-2">
+            <!-- Page Nav -->
+            <div class="flex items-center border-r border-gray-300 pr-2">
+                <button onclick="changePage(-1)" class="px-2 py-1 text-gray-500 hover:text-indigo-600 transition"><i class="fa-solid fa-chevron-left"></i></button>
+                <input type="number" id="page-input" class="w-10 text-center text-xs font-bold bg-white border border-gray-200 rounded py-1 mx-1 focus:ring-1 focus:ring-indigo-500 focus:outline-none" value="1" min="1" onkeypress="handlePageInput(event)">
+                <span class="text-xs text-gray-400 mx-1">/ <span id="total-pages">0</span></span>
+                <button onclick="changePage(1)" class="px-2 py-1 text-gray-500 hover:text-indigo-600 transition"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+            
+            <!-- Zoom -->
+            <div class="flex items-center">
+                <button onclick="changeZoom(-0.25)" class="px-2 py-1 hover:bg-gray-200 rounded-l text-gray-600 transition-colors"><i class="fa-solid fa-minus"></i></button>
+                <span id="zoom-level" class="px-2 py-1 text-xs font-mono font-bold flex items-center justify-center text-gray-700 min-w-[45px]">150%</span>
+                <button onclick="changeZoom(0.25)" class="px-2 py-1 hover:bg-gray-200 rounded-r text-gray-600 transition-colors"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+
+        <div class="flex gap-2 sm:gap-3 items-center">
+            <div id="upload-area">
+                <label class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded cursor-pointer hover:bg-blue-700 transition-colors shadow text-sm font-medium" title="Tải PDF từ máy">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span class="hidden sm:inline">PDF</span>
+                    <input type="file" id="file-input" accept=".pdf" class="hidden">
+                    <input type="file" id="json-input" accept=".json" class="hidden">
+                </label>
+            </div>
+
+            <div id="tools-area" class="hidden flex items-center gap-2">
+                <!-- Nút lưu sách Local System -->
+                <button id="btn-save-library" onclick="openSaveToLibraryModal()" class="px-3 py-1.5 rounded text-sm font-bold bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-200 transition-all hover:bg-indigo-100 flex items-center gap-1" title="Lưu sách vào thư mục trên máy tính & đồng bộ từ vựng">
+                    <i class="fa-solid fa-hard-drive"></i> <span class="hidden sm:inline">Lưu sách</span>
+                </button>
+
+                <!-- Bookmark Button -->
+                <button id="btn-bookmark" onclick="addBookmarkCurrentPage()" class="w-8 h-8 rounded-full bg-white border border-gray-300 text-gray-400 hover:text-yellow-500 hover:border-yellow-400 flex items-center justify-center transition shadow-sm" title="Đánh dấu trang này">
+                    <i class="fa-solid fa-star"></i>
+                </button>
+
+                <div class="hidden sm:flex bg-gray-200 p-1 rounded border border-gray-300">
+                    <button id="mode-word" class="mode-btn active px-3 py-1 rounded text-xs transition-all">Từ</button>
+                    <button id="mode-sentence" class="mode-btn px-3 py-1 rounded text-xs transition-all">Câu</button>
+                </div>
+                <button id="btn-capture" title="Phím tắt: Space" class="px-3 py-1.5 rounded text-sm font-bold bg-white shadow text-gray-500 ring-2 ring-transparent transition-all hover:text-gray-700 flex items-center gap-1">
+                    <i class="fa-solid fa-crop-simple"></i> <span class="hidden sm:inline">Đọc</span>
+                </button>
+            </div>
+
+            <div class="relative group ml-1">
+                <button class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center border border-indigo-200 hover:bg-indigo-200 transition-colors"><i class="fa-solid fa-user"></i></button>
+                <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 border border-gray-100 hidden group-hover:block hover:block z-50">
+                    <div class="px-4 py-2 border-b text-xs text-gray-500 truncate" id="user-email-display">user@example.com</div>
+                    <button onclick="handleChangeFolder()" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-folder-tree mr-2"></i> Đổi thư mục lưu PDF</button>
+                    <button onclick="handleLogout()" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"><i class="fa-solid fa-sign-out-alt mr-2"></i> Đăng xuất</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content" class="flex-1 flex overflow-hidden flex-row relative hidden">
+        <!-- LEFT: SIDEBAR (Tabs - Fixed) -->
+        <div id="left-sidebar" class="w-48 md:w-64 bg-gray-50 border-r flex flex-col hidden shrink-0 overflow-hidden relative group/sidebar">
+            
+            <!-- Sidebar Top Action Bar -->
+            <div class="h-8 bg-gray-100 border-b border-gray-200 flex items-center justify-between px-2 shrink-0">
+                <span class="text-[10px] font-bold text-gray-500 uppercase">Menu</span>
+                <button onclick="toggleMainSidebar(false)" class="text-gray-400 hover:text-indigo-600 transition-colors p-1" title="Thu gọn (Ẩn sang trái)">
+                    <i class="fa-solid fa-angles-left"></i>
+                </button>
+            </div>
+
+            <!-- Sidebar Tabs (Trang / Dấu trang) -->
+            <div class="flex border-b text-[11px] font-bold text-gray-500 uppercase bg-white shrink-0">
+                <button id="tab-pages" class="flex-1 p-3 text-center sidebar-tab-active transition-colors border-b-2 border-indigo-600 text-indigo-600 focus:outline-none" onclick="switchSidebarTab('pages')">
+                    <i class="fa-regular fa-file-pdf mr-1"></i> Trang
+                </button>
+                <button id="tab-bookmarks" class="flex-1 p-3 text-center hover:bg-gray-50 transition-colors border-b-2 border-transparent focus:outline-none" onclick="switchSidebarTab('bookmarks')">
+                    <i class="fa-solid fa-star mr-1"></i> Bookmark
+                </button>
+            </div>
+
+            <!-- Content Containers -->
+            <div class="flex-1 flex flex-col min-h-0 relative">
+                <!-- Page List -->
+                <div id="page-list-container" class="absolute inset-0 overflow-y-auto bg-gray-100 p-1 space-y-1">
+                     <div id="page-list" class="space-y-1"></div>
+                </div>
+                
+                <!-- Bookmark List (Tree) -->
+                <div id="bookmark-container" class="absolute inset-0 bg-white hidden flex-col">
+                    <!-- Bookmark Toolbar -->
+                    <div class="flex justify-center items-center gap-1 bg-gray-100 border-b border-gray-200 p-1 shrink-0 shadow-sm">
+                        <button class="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors shadow-sm border border-transparent hover:border-gray-200" title="Lên" onclick="actionOnSelectedBookmark('up')"><i class="fa-solid fa-arrow-up text-[11px]"></i></button>
+                        <button class="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors shadow-sm border border-transparent hover:border-gray-200" title="Xuống" onclick="actionOnSelectedBookmark('down')"><i class="fa-solid fa-arrow-down text-[11px]"></i></button>
+                        <button class="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-orange-600 hover:bg-white rounded transition-colors shadow-sm border border-transparent hover:border-gray-200" title="Thụt trái (Làm cha)" onclick="actionOnSelectedBookmark('outdent')"><i class="fa-solid fa-outdent text-[11px]"></i></button>
+                        <button class="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-green-600 hover:bg-white rounded transition-colors shadow-sm border border-transparent hover:border-gray-200" title="Thụt phải (Làm con)" onclick="actionOnSelectedBookmark('indent')"><i class="fa-solid fa-indent text-[11px]"></i></button>
+                        <button class="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors shadow-sm border border-transparent hover:border-gray-200" title="Đổi tên" onclick="actionOnSelectedBookmark('rename')"><i class="fa-solid fa-pen text-[11px]"></i></button>
+                        <button class="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-white rounded transition-colors shadow-sm border border-transparent hover:border-gray-200" title="Xóa" onclick="actionOnSelectedBookmark('delete')"><i class="fa-solid fa-xmark text-[11px]"></i></button>
+                    </div>
+                    <div id="bookmark-tree" class="flex-1 overflow-y-auto p-2 space-y-1 pb-4"></div>
+                </div>
+            </div>
+        </div>
+            <button id="sidebar-expand-btn" onclick="toggleMainSidebar(true)" class="absolute left-0 top-0 z-40 bg-white border border-gray-200 shadow-md rounded-r-md p-2 text-gray-400 hover:text-indigo-600 hidden transition-all" title="Hiện thanh bên">
+                <i class="fa-solid fa-angles-right"></i>
+            </button>
+        <!-- CENTER: PDF -->
+        <div class="flex-1 bg-gray-200 overflow-auto relative flex justify-center p-4 outline-none group/main" id="main-scroll" tabindex="0">
+            <!-- Expand Sidebar Button (Hidden by default, shown when sidebar collapsed) -->
+
+
+            <div id="loading-overlay" class="absolute inset-0 z-50 bg-white bg-opacity-90 flex flex-col items-center justify-center hidden">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-600 mb-2"></i>
+                <p id="loading-text" class="text-sm font-medium text-gray-600">Đang xử lý...</p>
+            </div>
+
+            <div id="empty-state" class="self-center text-center text-gray-400 mt-20">
+                <i class="fa-solid fa-cloud-arrow-up text-6xl opacity-20 mb-4"></i>
+                <p>Tải PDF từ máy để bắt đầu học</p>
+                <p class="text-xs text-gray-400 mt-2">(Sau khi tải, bạn có thể lưu file vào Thư mục Local để tự động mở lại)</p>
+                <button onclick="document.getElementById('file-input').click()" class="mt-4 px-4 py-2 bg-white border border-gray-300 shadow-sm rounded text-indigo-600 font-bold hover:bg-gray-50">Chọn PDF từ máy</button>
+            </div>
+            <div id="canvas-wrapper" class="canvas-container hidden transition-transform duration-200 origin-top">
+                <canvas id="pdf-canvas"></canvas>
+                <div id="overlay"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: SIDEBAR (WORD LIST) -->
+        <div class="w-80 md:w-96 bg-white border-l flex flex-col shadow-xl z-30 shrink-0 h-full">
+            <div class="p-3 bg-white border-b flex flex-col gap-2 shadow-sm z-10">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase flex gap-2 items-center">
+                        Từ vựng (<span id="saved-count">0</span>)
+                        <i class="fa-solid fa-cloud text-indigo-400" title="Đã đồng bộ Cloud"></i>
+                    </h3>
+                    <div class="flex gap-1">
+                        <button id="btn-ai-chat" class="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded hover:bg-purple-100 transition-colors flex items-center gap-1" onclick="openGeneralAIChat()"><i class="fa-solid fa-comments"></i> Hỏi AI</button>
+                        
+                        <!-- UPGRADED STUDY BUTTON -->
+                        <button id="btn-study-mode" class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors" onclick="openStudyModal()"><i class="fa-solid fa-graduation-cap"></i> Học</button>
+                        
+                        <div class="flex bg-gray-100 rounded p-0.5 gap-0.5">
+                            <button id="btn-import-json" title="Nhập dữ liệu JSON" class="text-xs text-orange-600 hover:bg-white px-1.5 py-1 rounded transition-colors"><i class="fa-solid fa-file-import"></i></button>
+                            <button id="btn-export-json" title="Xuất dữ liệu JSON" class="text-xs text-blue-600 hover:bg-white px-1.5 py-1 rounded transition-colors"><i class="fa-solid fa-file-code"></i></button>
+                            <button id="btn-export-txt" title="Xuất Text đơn giản" class="text-xs text-green-600 hover:bg-white px-1.5 py-1 rounded transition-colors"><i class="fa-solid fa-file-lines"></i></button>
+                        </div>
+
+
+                    </div>
+                </div>
+                <!-- GROUP FILTER WITH SETTINGS BUTTON -->
+                <div class="flex items-center gap-1 bg-gray-50 p-1.5 rounded border border-gray-200">
+                    <i class="fa-solid fa-filter text-gray-400 text-xs pl-1"></i>
+                    <select id="group-filter" onchange="filterListByGroup(this.value)" class="bg-transparent text-xs font-medium text-gray-700 w-full focus:outline-none cursor-pointer max-w-[150px] truncate">
+                        <option value="all">Tất cả nhóm</option>
+                        <option value="Chung">Chung</option>
+                    </select>
+                    <button onclick="createNewGroup()" class="text-xs text-indigo-600 hover:bg-indigo-100 p-1.5 rounded transition-colors" title="Tạo nhóm mới"><i class="fa-solid fa-plus"></i></button>
+                    <!-- THÊM NÚT ĐỔI TÊN NHÓM Ở ĐÂY -->
+                    <button id="btn-rename-group" onclick="renameCurrentGroup()" class="text-xs text-blue-600 hover:bg-blue-100 p-1.5 rounded transition-colors hidden" title="Đổi tên nhóm đang chọn"><i class="fa-solid fa-pen"></i></button>
+                    <!-- SETTINGS BUTTON ADDED HERE -->
+                    <button onclick="openSettingsModal()" class="text-xs text-gray-500 hover:bg-gray-200 p-1.5 rounded transition-colors" title="Cài đặt hiển thị"><i class="fa-solid fa-gear"></i></button>
+                    <button id="btn-clear-all" class="text-xs text-red-400 hover:text-red-600 px-2 py-1 hover:bg-red-50 rounded transition-colors" onclick="clearAllWords()"><i class="fa-solid fa-trash"></i></button>
+                    <div class="w-px h-4 bg-gray-300 mx-0.5"></div>
+                    <button onclick="sortVocab('asc')" class="text-xs text-gray-500 hover:text-indigo-600 px-1.5 py-1 hover:bg-indigo-50 rounded transition-colors" title="Cũ nhất xếp trước (Từ trên xuống)"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button onclick="sortVocab('desc')" class="text-xs text-gray-500 hover:text-indigo-600 px-1.5 py-1 hover:bg-indigo-50 rounded transition-colors" title="Mới nhất xếp trước (Từ dưới lên)"><i class="fa-solid fa-arrow-up"></i></button>
+                    <div class="w-px h-4 bg-gray-300 mx-0.5"></div>
+                    <button id="btn-toggle-highlights" onclick="toggleHighlights()" class="text-xs text-gray-500 hover:text-indigo-600 px-1.5 py-1 hover:bg-indigo-50 rounded transition-colors" title="Bật/tắt hiển thị vùng từ vựng trên PDF"><i class="fa-solid fa-eye"></i></button>
+                </div>
+            </div>
+            
+            <div id="word-list" class="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
+                <div class="text-center py-10 text-gray-400 text-sm italic">Chưa có từ vựng nào...</div>
+            </div>
+        </div>
+
+        <!-- SETTINGS MODAL -->
+        <div id="settings-modal" class="fixed inset-0 z-[120] bg-black bg-opacity-60 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-all">
+            <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-fade-in-up">
+                <div class="bg-gray-50 border-b p-3 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-700 flex items-center gap-2"><i class="fa-solid fa-sliders"></i> Tùy chỉnh hiển thị</h3>
+                    <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="flex border-b text-sm font-medium text-gray-500">
+                    <button onclick="switchSettingsTab('hanzi')" id="tab-btn-hanzi" class="flex-1 py-3 text-center settings-tab-active text-[13px] sm:text-sm">Hán tự</button>
+                    <button onclick="switchSettingsTab('pinyin')" id="tab-btn-pinyin" class="flex-1 py-3 text-center hover:text-indigo-600 text-[13px] sm:text-sm">Pinyin</button>
+                    <button onclick="switchSettingsTab('meaning')" id="tab-btn-meaning" class="flex-1 py-3 text-center hover:text-indigo-600 text-[13px] sm:text-sm">Nghĩa</button>
+                    <button onclick="switchSettingsTab('highlight')" id="tab-btn-highlight" class="flex-1 py-3 text-center hover:text-indigo-600 text-[13px] sm:text-sm">Vùng cắt</button>
+                </div>
+                <div class="p-5">
+                    <div id="settings-hanzi" class="space-y-4">
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Màu sắc</label><input type="color" id="set-hanzi-color" class="h-8 w-16 cursor-pointer rounded border border-gray-300 p-0.5" onchange="previewSettings()"></div>
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Cỡ chữ (px)</label><input type="number" id="set-hanzi-size" class="w-20 border rounded p-1 text-sm text-center" min="10" max="40" onchange="previewSettings()"></div>
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Font chữ</label><select id="set-hanzi-font" class="border rounded p-1 text-sm w-32" onchange="previewSettings()"><option value="serif">Serif (Có chân)</option><option value="sans">Sans (Không chân)</option><option value="kaiti">KaiTi (Thư pháp)</option></select></div>
+                         <div class="flex items-center justify-between"><label class="text-sm text-gray-600">In đậm</label><input type="checkbox" id="set-hanzi-bold" class="w-4 h-4 text-indigo-600 rounded" onchange="previewSettings()"></div>
+                    </div>
+                    <div id="settings-pinyin" class="space-y-4 hidden">
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Màu sắc</label><input type="color" id="set-pinyin-color" class="h-8 w-16 cursor-pointer rounded border border-gray-300 p-0.5" onchange="previewSettings()"></div>
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Cỡ chữ (px)</label><input type="number" id="set-pinyin-size" class="w-20 border rounded p-1 text-sm text-center" min="8" max="30" onchange="previewSettings()"></div>
+                         <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Font chữ</label><select id="set-pinyin-font" class="border rounded p-1 text-sm w-32" onchange="previewSettings()"><option value="mono">Monospace</option><option value="sans">Sans Serif</option><option value="serif">Serif</option></select></div>
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">In đậm</label><input type="checkbox" id="set-pinyin-bold" class="w-4 h-4 text-indigo-600 rounded" onchange="previewSettings()"></div>
+                    </div>
+                    <div id="settings-meaning" class="space-y-4 hidden">
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Màu sắc</label><input type="color" id="set-meaning-color" class="h-8 w-16 cursor-pointer rounded border border-gray-300 p-0.5" onchange="previewSettings()"></div>
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Cỡ chữ (px)</label><input type="number" id="set-meaning-size" class="w-20 border rounded p-1 text-sm text-center" min="10" max="30" onchange="previewSettings()"></div>
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">Font chữ</label><select id="set-meaning-font" class="border rounded p-1 text-sm w-32" onchange="previewSettings()"><option value="sans">Sans Serif</option><option value="serif">Serif</option></select></div>
+                        <div class="flex items-center justify-between"><label class="text-sm text-gray-600">In đậm</label><input type="checkbox" id="set-meaning-bold" class="w-4 h-4 text-indigo-600 rounded" onchange="previewSettings()"></div>
+                    </div>
+                    <div id="settings-highlight" class="space-y-4 hidden">
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm text-gray-600">Màu nền</label>
+                            <input type="color" id="set-highlight-color" class="h-8 w-16 cursor-pointer rounded border border-gray-300 p-0.5" onchange="previewSettings()">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm text-gray-600">Độ đậm (0 - 100%)</label>
+                            <input type="number" id="set-highlight-opacity" class="w-20 border rounded p-1 text-sm text-center" min="0" max="100" onchange="previewSettings()">
+                        </div>
+                        <p class="text-xs text-gray-400 italic mt-2">* Tùy chỉnh màu sắc và độ trong suốt của vùng sáng (highlight) bao quanh các từ vựng đã cắt trên trang PDF.</p>
+                    </div>
+                </div>
+                <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
+                    <button onclick="resetSettings()" class="px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-500 mr-auto">Mặc định</button>
+                    <button onclick="closeSettingsModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">Đóng</button>
+                    <button onclick="saveSettings()" class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-all">Lưu cài đặt</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIBRARY MODAL -->
+        <div id="library-modal" class="fixed inset-y-0 left-0 w-80 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 z-[100] flex flex-col border-r border-gray-200">
+            <div class="p-4 bg-indigo-600 text-white flex justify-between items-center shadow">
+                <h2 class="font-bold text-lg"><i class="fa-solid fa-book-open mr-2"></i>Giá Sách</h2>
+                <button onclick="closeLibrary()" class="text-white hover:text-gray-200"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-2 bg-blue-50 text-blue-800 text-xs border-b">
+                <i class="fa-solid fa-hard-drive mr-1"></i> Sách được lưu trên thiết bị của bạn.
+            </div>
+            <div id="book-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <div class="text-center py-8 text-gray-400 text-sm">Trống</div>
+            </div>
+        </div>
+        <div id="library-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-[90] hidden" onclick="closeLibrary()"></div>
+
+        <!-- LƯU ĐƯỜNG DẪN SÁCH MODAL -->
+        <div id="save-library-modal" class="fixed inset-0 z-[150] bg-black bg-opacity-60 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-all">
+            <div class="bg-white w-full max-w-md rounded-xl shadow-2xl p-6">
+                <div class="flex items-center gap-3 mb-4 text-indigo-600">
+                    <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                        <i class="fa-solid fa-folder-open text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-lg text-gray-800">Lưu file vào máy tính</h3>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tên sách hiển thị</label>
+                        <input type="text" id="save-book-name" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Tên sách">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tên file vật lý (sẽ tạo trên ổ đĩa)</label>
+                        <input type="text" id="save-book-filename" disabled class="w-full border border-gray-200 bg-gray-50 rounded-lg p-2.5 text-sm text-gray-500">
+                        <p class="text-[11px] text-gray-500 mt-1 italic">* Ứng dụng sẽ tạo file này trong thư mục bạn cấp quyền để lần sau có thể tự động tải lại mà không cần tải lên lại.</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button onclick="closeSaveToLibraryModal()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">Hủy</button>
+                    <button onclick="confirmSaveToLibrary()" class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg hover:shadow-xl transition-all">Lưu ngay</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONFIRM OPEN BOOK MODAL -->
+        <div id="open-book-modal" class="fixed inset-0 z-[150] bg-black bg-opacity-60 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-all">
+            <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6">
+                <div class="flex items-center gap-3 mb-4 text-indigo-600">
+                    <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                        <i class="fa-solid fa-book-open-reader text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-lg text-gray-800">Mở tài liệu</h3>
+                </div>
+                <p class="text-sm text-gray-600 mb-6">Bạn đang yêu cầu tải file từ thư mục máy tính: <br><strong id="confirm-book-name" class="text-indigo-600 block mt-2 break-words text-lg"></strong></p>
+                <input type="hidden" id="confirm-book-id">
+                <input type="hidden" id="confirm-book-filename">
+                <div class="flex justify-end gap-2">
+                    <button onclick="closeOpenBookModal()" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">Hủy bỏ</button>
+                    <button onclick="confirmOpenBook()" class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg hover:shadow-xl transition-all">Mở ngay</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- GROUP MODAL -->
+        <div id="group-modal" class="fixed inset-0 z-[120] bg-black bg-opacity-60 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-all">
+            <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 transform transition-all scale-100 animate-fade-in-up">
+                <div class="flex items-center gap-3 mb-4 text-indigo-600">
+                    <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+                        <i id="modal-icon" class="fa-solid fa-folder-plus text-xl"></i>
+                    </div>
+                    <h3 id="modal-title-text" class="font-bold text-lg text-gray-800">Tạo nhóm mới</h3>
+                </div>
+                <input type="text" id="new-group-input" class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none mb-5 transition-all shadow-sm" placeholder="Nhập nội dung..." onkeypress="handleInputModalKey(event)">
+                <div class="flex justify-end gap-2">
+                    <button onclick="closeGroupModal()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 rounded-lg transition-colors">Hủy bỏ</button>
+                    <button id="modal-confirm-btn" onclick="confirmInputModal()" class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg hover:shadow-xl transition-all">Xác nhận</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI CHAT MODAL -->
+        <div id="ai-modal" class="fixed inset-0 z-[110] bg-black bg-opacity-60 hidden flex items-center justify-center p-4">
+             <div class="bg-white w-full max-w-3xl  rounded-xl shadow-2xl flex flex-col h-[90vh] md:h-[95vh] animate-fade-in-up">
+                <div class="p-4 border-b flex justify-between items-center bg-indigo-50 rounded-t-xl shrink-0">
+                    <h3 class="font-bold text-indigo-700 flex items-center gap-2"><i class="fa-solid fa-robot"></i> AI Trợ Lý Tiếng Trung</h3>
+                    <button onclick="closeAIModal()" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-indigo-100 transition-colors"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div class="flex-1 p-4 overflow-y-auto bg-gray-50 flex flex-col gap-3" id="ai-content"></div>
+                <div class="p-3 border-t bg-white rounded-b-xl shrink-0">
+                    <div class="relative flex items-center gap-2">
+                        <input type="text" id="ai-input" class="w-full pl-4 pr-12 py-3 rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-sm transition-all" placeholder="Hỏi về từ vựng, ngữ pháp..." onkeypress="handleAIEnter(event)">
+                        <button onclick="sendAIQuery()" class="absolute right-1.5 p-2 bg-indigo-600 text-white rounded-full w-9 h-9 flex items-center justify-center hover:bg-indigo-700 transition-all shadow-md"><i class="fa-solid fa-paper-plane text-xs"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- STUDY MODAL -->
+        <div id="study-modal" class="fixed inset-0 z-[100] bg-gray-900 bg-opacity-90 hidden flex flex-col items-center justify-center p-4">
+             <div class="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col relative">
+                <button onclick="closeStudyModal()" class="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition shadow-md"><i class="fa-solid fa-xmark text-xl"></i></button>
+                <div class="bg-white pl-6 pr-16 py-4 flex items-center border-b border-gray-200 justify-between">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 mr-3"><i class="fas fa-graduation-cap"></i></div>
+                        <div><h1 class="font-bold text-gray-800 text-lg">Góc Học Tập</h1><p id="study-subtitle" class="text-xs text-gray-500">Đang học: Tất cả</p></div>
+                    </div>
+                    <div class="flex items-center gap-2"><span class="text-xs text-gray-500 font-bold uppercase mr-1">Đã thuộc:</span><div id="study-total-progress" class="w-12 h-12 flex items-center justify-center text-xs font-bold bg-gray-100 rounded-full text-gray-500">0%</div></div>
+                </div>
+                <div class="px-6 py-2 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-3 items-center">
+                    <div class="bg-gray-200 p-1 rounded-xl flex text-sm font-semibold w-full md:w-auto flex-1">
+                        <button id="tabFlashcard" class="flex-1 py-2 rounded-lg bg-white text-indigo-600 shadow-sm transition-all duration-300" onclick="switchTab('flashcard')"><i class="fas fa-clone mr-1"></i> Flashcard</button>
+                        <button id="tabList" class="flex-1 py-2 rounded-lg bg-transparent text-gray-500 hover:text-gray-700 transition-all duration-300" onclick="switchTab('list')"><i class="fas fa-list mr-1"></i> Danh sách</button>
+                        <button id="tabQuiz" class="flex-1 py-2 rounded-lg bg-transparent text-gray-500 hover:text-gray-700 transition-all duration-300" onclick="switchTab('quiz')"><i class="fas fa-check-square mr-1"></i> Kiểm tra</button>
+                    </div>
+                     <label class="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition text-sm"><input type="checkbox" id="filterWeakWords" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" onchange="toggleWeakFilter()"><span class="text-gray-600 font-medium select-none"><i class="fas fa-filter text-orange-400 mr-1"></i> Từ chưa thuộc</span></label>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 bg-gray-50 flex flex-col items-center justify-start relative">
+                    <div id="flashcardView" class="w-full max-w-md flex flex-col items-center h-full justify-center py-4">
+                        <div class="relative w-full aspect-[4/3] perspective-1000 mb-6">
+                            <button id="openWriterBtn" class="absolute top-4 right-16 z-20 w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shadow-md hover:bg-indigo-200 transition btn-press" title="Tập viết"><i class="fas fa-pen-nib"></i></button>
+                            <button id="speakBtn" class="absolute top-4 right-4 z-20 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shadow-md hover:bg-blue-200 transition btn-press" title="Phát âm"><i class="fas fa-volume-up text-lg"></i></button>
+                             <button id="markMemorizedBtn" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-12 h-12 bg-white text-gray-300 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition btn-press border border-gray-100" title="Đánh dấu đã thuộc" onclick="toggleMemorizedFlashcard(event)"><i class="fas fa-check text-xl"></i></button>
+                            <div id="mainCard" class="card-inner card-container w-full h-full relative transform-style-3d shadow-2xl shadow-indigo-100 rounded-3xl cursor-pointer" onclick="flipCard()">
+                                <div class="card-face absolute w-full h-full backface-hidden bg-white rounded-3xl flex flex-col items-center justify-center border-2 border-gray-50 overflow-hidden pb-8">
+                                    <div class="text-center z-10 w-full px-4"><span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 block">Hán tự</span><div id="fc-front" class="card-front font-kaiti text-6xl md:text-7xl text-gray-800 leading-tight drop-shadow-sm select-none break-words"></div><p class="text-sm text-gray-400 mt-6 animate-pulse">Chạm để xem nghĩa</p></div>
+                                </div>
+                                <div class="card-face absolute w-full h-full backface-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl flex flex-col items-center justify-center rotate-y-180 text-white border-2 border-indigo-500 pb-8">
+                                    <div class="text-center p-6 w-full"><span class="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-4 block">Pinyin & Nghĩa</span><div id="fc-pinyin" class="pinyin text-3xl font-bold mb-3 font-sans tracking-wide text-yellow-300"></div><div class="w-12 h-1 bg-white/20 rounded-full mx-auto mb-4"></div><div id="fc-meaning" class="meaning text-xl font-medium leading-relaxed break-words"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-full flex justify-between items-center px-2 mb-6"><div class="text-xs font-bold text-gray-400 uppercase">Tiến độ</div><div id="fc-counter" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">0 / 0</div></div>
+                        <div class="grid grid-cols-3 gap-4 w-full"><button onclick="prevCard()" class="btn-press bg-white border border-gray-200 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 h-14 rounded-2xl shadow-sm flex items-center justify-center transition text-xl"><i class="fas fa-arrow-left"></i></button><button onclick="shuffleCards()" class="btn-press bg-gradient-to-r from-orange-500 to-red-500 text-white h-14 rounded-2xl shadow-lg shadow-orange-200 flex items-center justify-center transition font-bold gap-2 text-sm hover:brightness-110"><i class="fas fa-random"></i></button><button onclick="nextCard()" class="btn-press bg-indigo-600 text-white hover:bg-indigo-700 h-14 rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-center transition text-xl"><i class="fas fa-arrow-right"></i></button></div>
+                    </div>
+                    <div id="listView" class="w-full max-w-2xl hidden flex-col gap-3 pb-20">
+                         <div id="study-pagination" class="flex justify-center items-center gap-3 py-2"></div>
+                        <div id="study-list-container" class="flex flex-col gap-3"></div>
+                    </div>
+                    <div id="quizView" class="w-full max-w-md hidden flex-col items-center justify-center h-full">
+                        <div id="quizSetup" class="w-full bg-white rounded-3xl p-6 shadow-md border border-gray-100 text-center">
+                            <div class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm"><i class="fas fa-clipboard-check"></i></div>
+                            <h2 class="text-xl font-bold text-gray-800 mb-2">Kiểm tra từ vựng</h2>
+                            <p class="text-gray-500 text-sm mb-6">Chọn số lượng câu hỏi</p>
+                            <div class="grid grid-cols-4 gap-3 mb-6"><button onclick="selectQuizCount(5)" class="quiz-count-btn btn-press py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition" data-count="5">5</button><button onclick="selectQuizCount(10)" class="quiz-count-btn btn-press py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition" data-count="10">10</button><button onclick="selectQuizCount(20)" class="quiz-count-btn btn-press py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition" data-count="20">20</button><button onclick="selectQuizCount('all')" class="quiz-count-btn btn-press py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition" data-count="all">Hết</button></div>
+                            <button onclick="startQuiz()" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2"><i class="fas fa-play"></i> Bắt đầu</button>
+                        </div>
+                        <div id="quizActive" class="w-full hidden flex-col h-full justify-center">
+                            <div class="flex justify-between items-center mb-6 px-1"><span id="quizProgressText" class="text-lg font-bold text-indigo-600">1/10</span><span id="quizScoreText" class="text-sm font-bold text-green-700 bg-green-50 px-3 py-1 rounded-full border border-green-100">Điểm: 0</span></div>
+                            <div class="w-full bg-gray-200 h-2 rounded-full mb-8 overflow-hidden"><div id="quizProgressBar" class="bg-indigo-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div></div>
+                            <div class="w-full bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6 flex flex-col items-center justify-center min-h-[160px]"><div id="quizQuestionLabel" class="text-xs font-bold text-gray-400 uppercase mb-2">Từ vựng này là gì?</div><div id="quizQuestionHanzi" class="font-kaiti text-6xl text-gray-800 leading-tight text-center"></div><div id="quizQuestionReveal" class="mt-4 text-xl font-bold text-indigo-600 h-8 transition-opacity duration-300 opacity-0 text-center"></div></div>
+                            <div id="quizOptions" class="w-full grid grid-cols-1 gap-3"></div>
+                        </div>
+                        <div id="quizResult" class="w-full hidden flex-col items-center justify-center py-10">
+                            <div class="w-32 h-32 rounded-full bg-white border-8 border-indigo-100 flex items-center justify-center text-4xl font-bold text-indigo-600 shadow-sm mb-6" id="finalScoreCircle">0%</div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-2">Hoàn thành!</h2>
+                            <p class="text-gray-500 mb-8" id="finalScoreDetail">...</p>
+                            <div class="w-full flex gap-3"><button onclick="switchTab('flashcard')" class="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200 transition">Học tiếp</button><button onclick="resetQuizView()" class="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-700 transition">Làm lại</button></div>
+                        </div>
+                    </div>
+                </div>
+             </div>
+        </div>
+
+        <!-- WRITING MODAL -->
+        <div id="animationModal" class="fixed inset-0 bg-gray-900/60 z-[150] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-300 opacity-0">
+            <div class="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl transform transition-all scale-95" id="animationModalContent">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Tập viết</h2>
+                    <button id="closeAnimationModal" class="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="text-center mb-4">
+                    <div class="flex items-center justify-center gap-2 mb-2"><span id="animationPinyin" class="text-lg font-bold text-indigo-600"></span><span class="text-gray-300">|</span><span id="animationMeaning" class="text-gray-600 text-sm font-medium"></span></div>
+                    <div id="characterTabs" class="flex justify-center gap-2 flex-wrap mb-4"></div>
+                </div>
+                <div class="bg-white border-2 border-gray-100 rounded-3xl p-2 mb-6 shadow-inner flex justify-center items-center aspect-square max-w-[260px] mx-auto relative overflow-hidden"><div id="animationTarget" class="w-full h-full flex items-center justify-center cursor-pointer"></div></div>
+                <button id="animateActionBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex items-center justify-center gap-2"><i class="fas fa-play"></i> Viết lại</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- SCRIPTS -->
+    <script>
+        const apiKey = "sk-3985f4e0a07a496b97056c0f4dbcfe13"; 
+        const TEACHER_CODE = "ruands10"; 
+        let appId, firebaseConfig;
+
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                firebaseConfig = { apiKey: "AIzaSyB0v6xpNxqRjcA4G2ctjGVl7Zm4hArdjVc", authDomain: "qlhsapp-26922.firebaseapp.com", projectId: "qlhsapp-26922", storageBucket: "qlhsapp-26922.firebasestorage.app", messagingSenderId: "585381201970", appId: "1:585381201970:web:377cfcc47d2480a48b942b", measurementId: "G-DPRY4FF83H" };
+            }
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) { console.error(e); firebaseConfig = {}; }
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // --- GLOBAL CUSTOM MODAL ---
+        window.showCustomModal = function(message, title = 'Thông báo', type = 'info', isConfirm = false) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('global-alert-modal');
+                const content = document.getElementById('global-alert-content');
+                const iconWrap = document.getElementById('global-alert-icon');
+                const titleEl = document.getElementById('global-alert-title');
+                const msgEl = document.getElementById('global-alert-message');
+                const btnWrap = document.getElementById('global-alert-buttons');
+
+                // Setup Icon
+                let iconHtml = '<i class="fa-solid fa-circle-info text-2xl text-blue-600"></i>';
+                iconWrap.className = 'mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-4';
+                if (type === 'error') {
+                    iconHtml = '<i class="fa-solid fa-triangle-exclamation text-2xl text-red-600"></i>';
+                    iconWrap.className = 'mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4';
+                } else if (type === 'success') {
+                    iconHtml = '<i class="fa-solid fa-check text-2xl text-green-600"></i>';
+                    iconWrap.className = 'mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4';
+                } else if (type === 'warning') {
+                    iconHtml = '<i class="fa-solid fa-exclamation text-2xl text-yellow-600"></i>';
+                    iconWrap.className = 'mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-yellow-100 mb-4';
+                }
+                iconWrap.innerHTML = iconHtml;
+
+                // Setup Text
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+
+                // Setup Buttons
+                btnWrap.innerHTML = '';
+                const closeFunc = () => {
+                    modal.classList.add('opacity-0');
+                    content.classList.remove('scale-100');
+                    content.classList.add('scale-95');
+                    setTimeout(() => modal.classList.add('hidden'), 200);
+                };
+
+                if (isConfirm) {
+                    const btnCancel = document.createElement('button');
+                    btnCancel.className = "px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 focus:outline-none transition-colors w-1/2";
+                    btnCancel.textContent = "Hủy bỏ";
+                    btnCancel.onclick = () => { closeFunc(); resolve(false); };
+
+                    const btnOk = document.createElement('button');
+                    const okColorClass = type === 'error' ? 'bg-red-600 hover:bg-red-700 ring-red-500' : 'bg-indigo-600 hover:bg-indigo-700 ring-indigo-500';
+                    btnOk.className = `px-4 py-2 text-white rounded-lg text-sm font-bold shadow-lg transition-colors w-1/2 ${okColorClass}`;
+                    btnOk.textContent = "Đồng ý";
+                    btnOk.onclick = () => { closeFunc(); resolve(true); };
+
+                    btnWrap.appendChild(btnCancel);
+                    btnWrap.appendChild(btnOk);
+                } else {
+                    const btnOk = document.createElement('button');
+                    btnOk.className = "px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-lg hover:bg-indigo-700 transition-colors w-full";
+                    btnOk.textContent = "Đã hiểu";
+                    btnOk.onclick = () => { closeFunc(); resolve(true); };
+                    btnWrap.appendChild(btnOk);
+                }
+
+                // Show
+                modal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    modal.classList.remove('opacity-0');
+                    content.classList.remove('scale-95');
+                    content.classList.add('scale-100');
+                });
+            });
+        };
+
+        // --- LOCAL FILE SYSTEM API WRAPPER ---
+        const LocalFileStore = {
+            dbName: 'TrungPDF_DB',
+            storeName: 'directory_handles',
+            rootKey: 'pdf_library_root',
+
+            openDB: () => {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open(LocalFileStore.dbName, 1);
+                    req.onupgradeneeded = (e) => {
+                        if (!e.target.result.objectStoreNames.contains(LocalFileStore.storeName)) {
+                            e.target.result.createObjectStore(LocalFileStore.storeName);
+                        }
+                    };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            },
+
+            saveHandle: async (key, handle) => {
+                const database = await LocalFileStore.openDB();
+                const tx = database.transaction(LocalFileStore.storeName, 'readwrite');
+                tx.objectStore(LocalFileStore.storeName).put(handle, key);
+                return new Promise(resolve => { tx.oncomplete = () => resolve(true); });
+            },
+
+            getHandle: async (key) => {
+                const database = await LocalFileStore.openDB();
+                return new Promise((resolve, reject) => {
+                    const tx = database.transaction(LocalFileStore.storeName, 'readonly');
+                    const req = tx.objectStore(LocalFileStore.storeName).get(key);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            },
+
+            resetRoot: async () => {
+                const database = await LocalFileStore.openDB();
+                const tx = database.transaction(LocalFileStore.storeName, 'readwrite');
+                tx.objectStore(LocalFileStore.storeName).delete(LocalFileStore.rootKey);
+            },
+
+            getRootDir: async () => {
+                let handle = await LocalFileStore.getHandle(LocalFileStore.rootKey);
+                if (handle) {
+                    if (await handle.queryPermission({mode: 'readwrite'}) === 'granted') return handle;
+                    if (await handle.requestPermission({mode: 'readwrite'}) === 'granted') return handle;
+                }
+                
+                await window.showCustomModal("Lần đầu sử dụng tính năng lưu sách đám mây (Local System):\nHãy chọn một thư mục trên máy tính của bạn (VD: ổ D:/Kho_Sach_PDF) để ứng dụng có thể lưu và tự động mở lại các file PDF cho những lần sau.", "Cấp quyền thư mục", "info");
+                handle = await window.showDirectoryPicker();
+                await LocalFileStore.saveHandle(LocalFileStore.rootKey, handle);
+                return handle;
+            },
+
+            savePdf: async (fileName, arrayBuffer) => {
+                if (!window.showDirectoryPicker) {
+                    throw new Error("Trình duyệt của bạn không hỗ trợ tính năng lưu file hệ thống (Hãy dùng Chrome/Edge trên máy tính).");
+                }
+                const root = await LocalFileStore.getRootDir();
+                const fileHandle = await root.getFileHandle(fileName, {create: true});
+                const writable = await fileHandle.createWritable();
+                await writable.write(arrayBuffer);
+                await writable.close();
+            },
+
+            getPdf: async (fileName) => {
+                const root = await LocalFileStore.getRootDir();
+                const fileHandle = await root.getFileHandle(fileName);
+                const file = await fileHandle.getFile();
+                return await file.arrayBuffer();
+            }
+        };
+
+        // --- VARS ---
+        let currentUser = null;
+        let sessionBooks = []; 
+        let cloudLibraryBooks = []; 
+        let currentBookId = null;
+        let currentLocalFileName = ''; 
+        let currentPdfData = null; 
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pdfScale = 1.5;
+        let captureMode = 'read'; 
+        let translationType = 'word'; 
+        let startX, startY;
+        let isDragging = false;
+        let savedWords = [];
+        let savedBookmarks = []; 
+        let unsubscribeVocab = null; 
+        let unsubscribeLibrary = null;
+        let currentGroupFilter = 'all'; 
+        
+        let pageRendering = false;
+        let pageNumPending = null;
+        let selectedBookmarkId = null; 
+        let draggedBookmarkId = null; 
+        let bookmarkToDeleteId = null; 
+
+        let inputModalMode = ''; 
+        let inputModalTargetId = null;
+        let showHighlights = false;
+
+        let vocabSettings = { hanzi: { color: '#1f2937', size: 18, font: 'serif', bold: true }, pinyin: { color: '#4f46e5', size: 12, font: 'mono', bold: false }, meaning: { color: '#4b5563', size: 14, font: 'sans', bold: false }, highlight: { color: '#60a5fa', opacity: 30 } };
+        const defaultSettings = JSON.parse(JSON.stringify(vocabSettings));
+
+        let studyList = [];
+        let currentStudyIndex = 0;
+        let isCardFlipped = false;
+        let isWeakFilterActive = false;
+        let currentListPage = 1;
+        const itemsPerPage = 50;
+        let quizQuestions = [];
+        let quizCurrentIndex = 0;
+        let quizScore = 0;
+        let isQuizAnswering = false;
+        let selectedQuizCount = 10;
+        let animationWriter = null;
+        let animationCharacters = [];
+
+        // --- CLOUD LIBRARY EXPOSED FUNCTIONS ---
+        window.handleChangeFolder = async function() {
+            try {
+                await LocalFileStore.resetRoot();
+                await LocalFileStore.getRootDir();
+                window.showCustomModal("Đã cập nhật thư mục lưu trữ thành công!", "Thành công", "success");
+            } catch (e) {
+                console.warn("User cancelled", e);
+            }
+        };
+
+        window.openSaveToLibraryModal = function() {
+            if (!currentPdfData) return window.showCustomModal("Vui lòng tải một file PDF lên trước khi lưu!", "Cảnh báo", "warning");
+            const bookName = document.getElementById('current-book-name').textContent;
+            document.getElementById('save-book-name').value = bookName !== 'Chưa có sách' ? bookName : '';
+            document.getElementById('save-book-filename').value = currentLocalFileName;
+            document.getElementById('save-library-modal').classList.remove('hidden');
+        }
+
+        window.closeSaveToLibraryModal = function() {
+            document.getElementById('save-library-modal').classList.add('hidden');
+        }
+
+        window.confirmSaveToLibrary = async function() {
+            if (!currentUser) return window.showCustomModal("Vui lòng đăng nhập để lưu sách!", "Yêu cầu đăng nhập", "warning");
+            const name = document.getElementById('save-book-name').value.trim();
+            const fileName = document.getElementById('save-book-filename').value.trim();
+            
+            if (!name || !fileName) return window.showCustomModal("Vui lòng nhập đủ thông tin!", "Thiếu thông tin", "warning");
+            
+            try {
+                await LocalFileStore.savePdf(fileName, currentPdfData);
+                const id = 'loc_' + btoa(unescape(encodeURIComponent(fileName))).replace(/[\+\/=\s]/g, "");
+                const ref = db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('library_books').doc(id);
+                await ref.set({ name, fileName, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+                closeSaveToLibraryModal();
+                window.showCustomModal("Đã lưu sách vào thư mục và đồng bộ lên Cloud thành công!", "Thành công", "success");
+            } catch (err) {
+                window.showCustomModal("Lỗi khi lưu sách: " + err.message, "Lỗi hệ thống", "error");
+            }
+        }
+
+        window.deleteCloudBook = async function(e, id) {
+            e.stopPropagation();
+            if (await window.showCustomModal("Xóa sách này khỏi Giá sách đám mây?\n(Lưu ý: File PDF gốc trong máy tính và kho từ vựng vẫn được giữ lại)", "Xác nhận xóa", "warning", true)) {
+                db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('library_books').doc(id).delete();
+                if (currentBookId === id) { 
+                    currentBookId = null; savedWords = []; savedBookmarks = []; pdfDoc = null; currentLocalFileName = ''; currentPdfData = null;
+                    if(unsubscribeVocab) unsubscribeVocab(); 
+                    document.getElementById('current-book-name').textContent = "Chưa chọn sách"; 
+                    document.getElementById('empty-state').classList.remove('hidden'); 
+                    document.getElementById('canvas-wrapper').classList.add('hidden'); 
+                    document.getElementById('tools-area').classList.add('hidden'); 
+                    document.getElementById('left-sidebar').classList.add('hidden'); 
+                    renderList(); 
+                }
+            }
+        }
+
+        window.promptOpenCloudBook = function(id, name, fileName) {
+            document.getElementById('confirm-book-id').value = id;
+            document.getElementById('confirm-book-name').textContent = name;
+            document.getElementById('confirm-book-filename').value = fileName;
+            document.getElementById('open-book-modal').classList.remove('hidden');
+            closeLibrary();
+        };
+
+        window.closeOpenBookModal = function() {
+            document.getElementById('open-book-modal').classList.add('hidden');
+        };
+
+        window.confirmOpenBook = async function() {
+            closeOpenBookModal();
+            const id = document.getElementById('confirm-book-id').value;
+            const name = document.getElementById('confirm-book-name').textContent;
+            const fileName = document.getElementById('confirm-book-filename').value;
+            
+            if (unsubscribeVocab) { unsubscribeVocab(); unsubscribeVocab = null; } 
+            currentBookId = id; 
+            currentLocalFileName = fileName;
+            document.getElementById('current-book-name').textContent = name; 
+            setupFirestoreListener(id); 
+            
+            try {
+                showLoading(true, "Đang tải file từ máy tính...");
+                currentPdfData = await LocalFileStore.getPdf(fileName);
+                pdfDoc = await pdfjsLib.getDocument(currentPdfData.slice(0)).promise;
+                pageNum = 1; 
+                document.getElementById("empty-state").classList.add("hidden");
+                document.getElementById("canvas-wrapper").classList.remove("hidden");
+                document.getElementById("tools-area").classList.remove("hidden");
+                document.getElementById("left-sidebar").classList.remove("hidden");
+                document.getElementById("left-sidebar").classList.add("flex");
+                document.getElementById("total-pages").textContent = pdfDoc.numPages;
+                generatePageNav();
+                await renderPage(pageNum);
+            } catch (e) {
+                window.showCustomModal(`Không thể đọc file "${fileName}" từ thư mục đã chọn.\n\nNguyên nhân có thể do file đã bị xóa, bị đổi tên, hoặc bạn chưa cấp quyền thư mục.\n\nChi tiết lỗi: ${e.message}`, "Lỗi đọc file", "error");
+                document.getElementById("empty-state").classList.remove("hidden");
+                document.getElementById("canvas-wrapper").classList.add("hidden");
+                document.getElementById("tools-area").classList.add("hidden");
+                document.getElementById("left-sidebar").classList.add("hidden");
+            } finally {
+                showLoading(false);
+            }
+        };
+
+        function setupLibraryListener() {
+            if (!currentUser) return;
+            const ref = db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('library_books');
+            unsubscribeLibrary = ref.orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+                cloudLibraryBooks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderBookshelf();
+            });
+        }
+
+
+        // --- EXPOSED ---
+        window.closeAIModal = function() { document.getElementById('ai-modal').classList.add('hidden'); };
+        window.openLibrary = function() { document.getElementById('library-modal').classList.remove('-translate-x-full'); document.getElementById('library-backdrop').classList.remove('hidden'); renderBookshelf(); };
+        window.closeLibrary = function() { document.getElementById('library-modal').classList.add('-translate-x-full'); document.getElementById('library-backdrop').classList.add('hidden'); };
+        window.deleteBookFromLibrary = async function(e, id) { 
+            e.stopPropagation(); 
+            if (await window.showCustomModal("Xóa sách tải tạm thời này khỏi phiên làm việc?", "Xác nhận xóa", "warning", true)) { 
+                sessionBooks = sessionBooks.filter(b => b.id !== id); 
+                if (currentBookId === id) { 
+                    currentBookId = null; savedWords = []; savedBookmarks = []; pdfDoc = null; currentLocalFileName = ''; currentPdfData = null; 
+                    if(unsubscribeVocab) unsubscribeVocab(); 
+                    document.getElementById('current-book-name').textContent = "Chưa chọn sách"; document.getElementById('empty-state').classList.remove('hidden'); document.getElementById('canvas-wrapper').classList.add('hidden'); document.getElementById('tools-area').classList.add('hidden'); document.getElementById('left-sidebar').classList.add('hidden'); renderList(); 
+                } 
+                renderBookshelf(); 
+            } 
+        };
+        window.toggleAuthMode = function(mode) { const l = document.getElementById('login-form'); const r = document.getElementById('register-form'); document.getElementById('auth-message').classList.add('hidden'); if (mode === 'register') { l.classList.add('hidden'); r.classList.remove('hidden'); } else { r.classList.add('hidden'); l.classList.remove('hidden'); } };
+        window.handleLogout = function() { auth.signOut().then(() => location.reload()); };
+        window.handleAnonymousLogin = function() { showAuthMessage('Đang vào chế độ khách...', 'text-indigo-600'); auth.signInAnonymously().catch(error => showAuthMessage(getAuthErrorMessage(error), 'text-red-500')); };
+        
+        // --- SIDEBAR TOGGLE ---
+        window.toggleMainSidebar = function(show) {
+            const sidebar = document.getElementById('left-sidebar');
+            const toggleBtn = document.getElementById('sidebar-expand-btn');
+            if (show) { sidebar.classList.remove('w-0', 'border-none', 'overflow-hidden'); sidebar.classList.add('w-48', 'md:w-64', 'border-r'); toggleBtn.classList.add('hidden'); }
+            else { sidebar.classList.remove('w-48', 'md:w-64', 'border-r'); sidebar.classList.add('w-0', 'border-none', 'overflow-hidden'); toggleBtn.classList.remove('hidden'); }
+        };
+
+        window.switchSidebarTab = function(tab) {
+            const tabPages = document.getElementById('tab-pages');
+            const tabBookmarks = document.getElementById('tab-bookmarks');
+            const listPages = document.getElementById('page-list-container');
+            const listBookmarks = document.getElementById('bookmark-container');
+            if (tab === 'pages') {
+                tabPages.className = "flex-1 p-3 text-center sidebar-tab-active transition-colors border-b-2 border-indigo-600 text-indigo-600 focus:outline-none";
+                tabBookmarks.className = "flex-1 p-3 text-center hover:bg-gray-50 transition-colors border-b-2 border-transparent focus:outline-none";
+                listPages.classList.remove('hidden'); 
+                listBookmarks.classList.add('hidden');
+                listBookmarks.classList.remove('flex');
+            } else {
+                tabBookmarks.className = "flex-1 p-3 text-center sidebar-tab-active transition-colors border-b-2 border-indigo-600 text-indigo-600 focus:outline-none";
+                tabPages.className = "flex-1 p-3 text-center hover:bg-gray-50 transition-colors border-b-2 border-transparent focus:outline-none";
+                listBookmarks.classList.remove('hidden'); 
+                listBookmarks.classList.add('flex');
+                listPages.classList.add('hidden');
+                renderBookmarkTree();
+            }
+        };
+
+        window.openSettingsModal = function() { document.getElementById('settings-modal').classList.remove('hidden'); loadSettingsToUI(); switchSettingsTab('hanzi'); };
+        window.closeSettingsModal = function() { document.getElementById('settings-modal').classList.add('hidden'); };
+        window.switchSettingsTab = function(tab) { ['hanzi', 'pinyin', 'meaning', 'highlight'].forEach(t => { document.getElementById(`tab-btn-${t}`).className = "flex-1 py-3 text-center hover:text-indigo-600 text-[13px] sm:text-sm"; document.getElementById(`settings-${t}`).classList.add('hidden'); }); document.getElementById(`tab-btn-${tab}`).className = "flex-1 py-3 text-center settings-tab-active text-[13px] sm:text-sm"; document.getElementById(`settings-${tab}`).classList.remove('hidden'); };
+        window.loadSettingsToUI = function() { 
+            if (!vocabSettings.highlight) vocabSettings.highlight = { color: '#60a5fa', opacity: 30 }; // Patch for old localstorage
+            ['hanzi', 'pinyin', 'meaning'].forEach(type => { document.getElementById(`set-${type}-color`).value = vocabSettings[type].color; document.getElementById(`set-${type}-size`).value = vocabSettings[type].size; document.getElementById(`set-${type}-font`).value = vocabSettings[type].font; document.getElementById(`set-${type}-bold`).checked = vocabSettings[type].bold; }); 
+            document.getElementById('set-highlight-color').value = vocabSettings.highlight.color;
+            document.getElementById('set-highlight-opacity').value = vocabSettings.highlight.opacity;
+        };
+        window.previewSettings = function() { 
+            if (!vocabSettings.highlight) vocabSettings.highlight = { color: '#60a5fa', opacity: 30 };
+            ['hanzi', 'pinyin', 'meaning'].forEach(type => { vocabSettings[type].color = document.getElementById(`set-${type}-color`).value; vocabSettings[type].size = parseInt(document.getElementById(`set-${type}-size`).value); vocabSettings[type].font = document.getElementById(`set-${type}-font`).value; vocabSettings[type].bold = document.getElementById(`set-${type}-bold`).checked; }); 
+            vocabSettings.highlight.color = document.getElementById('set-highlight-color').value;
+            let opacityVal = parseInt(document.getElementById('set-highlight-opacity').value);
+            if(isNaN(opacityVal)) opacityVal = 30;
+            vocabSettings.highlight.opacity = Math.max(0, Math.min(100, opacityVal));
+            applyListStyles(); 
+            if (window.drawSavedHighlights) window.drawSavedHighlights();
+        };
+        window.saveSettings = function() { localStorage.setItem('trungpdf_vocab_settings', JSON.stringify(vocabSettings)); closeSettingsModal(); };
+        window.resetSettings = function() { vocabSettings = JSON.parse(JSON.stringify(defaultSettings)); loadSettingsToUI(); applyListStyles(); if (window.drawSavedHighlights) window.drawSavedHighlights(); };
+        
+        window.hexToRgba = function(hex, opacity) {
+            let r = parseInt(hex.slice(1, 3), 16) || 96;
+            let g = parseInt(hex.slice(3, 5), 16) || 165;
+            let b = parseInt(hex.slice(5, 7), 16) || 250;
+            return `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
+        };
+
+        function applyListStyles() {
+            const getFontStack = (f) => { if (f === 'kaiti') return '"KaiTi", "楷体", "STKaiti", "BiauKai", serif'; if (f === 'serif') return 'serif'; if (f === 'mono') return 'monospace'; return 'sans-serif'; };
+            if (!vocabSettings.highlight) vocabSettings.highlight = { color: '#60a5fa', opacity: 30 };
+            const hlRgba = window.hexToRgba(vocabSettings.highlight.color, vocabSettings.highlight.opacity);
+            
+            const styleContent = ` 
+                #word-list .word-text { color: ${vocabSettings.hanzi.color} !important; font-size: ${vocabSettings.hanzi.size}px !important; line-height: 1.4 !important; font-family: ${getFontStack(vocabSettings.hanzi.font)} !important; font-weight: ${vocabSettings.hanzi.bold ? '700' : '400'} !important; } 
+                #word-list .word-pinyin { color: ${vocabSettings.pinyin.color} !important; font-size: ${vocabSettings.pinyin.size}px !important; line-height: 1.4 !important; margin-bottom: 0.25rem !important; font-family: ${getFontStack(vocabSettings.pinyin.font)} !important; font-weight: ${vocabSettings.pinyin.bold ? '700' : '400'} !important; } 
+                #word-list .word-meaning { color: ${vocabSettings.meaning.color} !important; font-size: ${vocabSettings.meaning.size}px !important; line-height: 1.4 !important; font-family: ${getFontStack(vocabSettings.meaning.font)} !important; font-weight: ${vocabSettings.meaning.bold ? '700' : '400'} !important; } 
+                
+                .saved-word-highlight:hover { background-color: ${hlRgba} !important; }
+                .saved-word-highlight.highlight-on { background-color: ${hlRgba} !important; }
+            `;
+            document.getElementById('dynamic-list-styles').innerHTML = styleContent;
+        }
+
+        window.filterListByGroup = function(val) { currentGroupFilter = val; renderList(); toggleRenameGroupBtn(); };
+        window.createNewGroup = function() { inputModalMode = 'createGroup'; inputModalTargetId = null; openInputModal('Tạo nhóm mới', 'fa-folder-plus', 'Nhập tên nhóm...'); };
+        
+        window.renameCurrentGroup = function() { 
+            if (currentGroupFilter === 'all' || currentGroupFilter === 'Chung') return; 
+            inputModalMode = 'renameGroup'; 
+            inputModalTargetId = currentGroupFilter; 
+            openInputModal('Đổi tên nhóm', 'fa-pen', 'Nhập tên mới...'); 
+            document.getElementById('new-group-input').value = currentGroupFilter; 
+        };
+        
+        window.toggleRenameGroupBtn = function() { 
+            const btn = document.getElementById('btn-rename-group'); 
+            if (btn) { 
+                if (currentGroupFilter === 'all' || currentGroupFilter === 'Chung') { 
+                    btn.classList.add('hidden'); 
+                } else { 
+                    btn.classList.remove('hidden'); 
+                } 
+            } 
+        };
+
+        window.closeGroupModal = function() { document.getElementById('group-modal').classList.add('hidden'); };
+        window.handleInputModalKey = function(e) { if (e.key === 'Enter') confirmInputModal(); };
+        window.openInputModal = function(title, iconClass, placeholder) { 
+            const modal = document.getElementById('group-modal'); 
+            const input = document.getElementById('new-group-input'); 
+            document.getElementById('modal-title-text').textContent = title; 
+            document.getElementById('modal-icon').className = `fa-solid ${iconClass} text-xl`; 
+            input.placeholder = placeholder; 
+            input.value = ''; 
+            modal.classList.remove('hidden'); 
+            setTimeout(() => input.focus(), 100); 
+        };
+        
+        window.confirmInputModal = function() { 
+            const input = document.getElementById('new-group-input'); 
+            const val = input.value.trim(); 
+            if (!val) return; 
+
+            if (inputModalMode === 'createGroup') { 
+                currentGroupFilter = val; 
+                renderList(); 
+                updateGroupFilterOptions(); 
+            } else if (inputModalMode === 'renameBookmark') { 
+                const node = findBookmarkNode(savedBookmarks, inputModalTargetId); 
+                if (node) { node.title = val; saveBookData(); renderBookmarkTree(); } 
+            } else if (inputModalMode === 'renameGroup') { 
+                let changed = false; 
+                savedWords.forEach(w => { 
+                    if ((w.group || 'Chung') === inputModalTargetId) { 
+                        w.group = val; 
+                        changed = true; 
+                    } 
+                }); 
+                if (changed) { 
+                    currentGroupFilter = val; 
+                    saveVocabToFirestore(); 
+                    renderList(); 
+                    updateGroupFilterOptions(); 
+                } else { 
+                    currentGroupFilter = val; 
+                    renderList(); 
+                    updateGroupFilterOptions(); 
+                } 
+            } 
+            closeGroupModal(); 
+        };
+
+        // --- BOOKMARK LOGIC ---
+        window.handlePageInput = function(e) { if (e.key === 'Enter') { const val = parseInt(e.target.value); if (val > 0 && val <= pdfDoc.numPages) { pageNum = val; renderPage(pageNum); } } };
+        window.changePage = function(diff) { if (!pdfDoc) return; const n = pageNum + diff; if (n >= 1 && n <= pdfDoc.numPages) { pageNum = n; renderPage(pageNum); } };
+        
+        window.addBookmarkCurrentPage = function() { 
+            if (!pdfDoc) return window.showCustomModal("Chưa có sách nào được mở!", "Thông báo", "warning"); 
+            const newBm = { id: 'bm-' + Date.now(), title: `Trang ${pageNum}`, page: pageNum, children: [], expanded: true };
+            if (selectedBookmarkId) {
+                const res = findBookmarkParentAndIndex(savedBookmarks, selectedBookmarkId);
+                if (res) {
+                    res.parentList.splice(res.index + 1, 0, newBm);
+                    selectedBookmarkId = newBm.id;
+                } else { savedBookmarks.push(newBm); selectedBookmarkId = newBm.id; }
+            } else { savedBookmarks.push(newBm); selectedBookmarkId = newBm.id; }
+            updateBookmarkUI(); saveBookData(); renderBookmarkTree(); switchSidebarTab('bookmarks'); 
+        };
+        
+        window.handleDragStart = function(e, id) { draggedBookmarkId = id; e.dataTransfer.effectAllowed = 'move'; e.target.classList.add('dragging'); e.dataTransfer.setData('text/plain', id); };
+        window.handleDragOver = function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; const targetRow = e.target.closest('.bookmark-row'); if (!targetRow) return; document.querySelectorAll('.bookmark-row').forEach(el => el.classList.remove('drag-over-top', 'drag-over-bottom', 'drag-over-center')); const rect = targetRow.getBoundingClientRect(); const relY = e.clientY - rect.top; const height = rect.height; if (relY < height * 0.25) { targetRow.classList.add('drag-over-top'); } else if (relY > height * 0.75) { targetRow.classList.add('drag-over-bottom'); } else { targetRow.classList.add('drag-over-center'); } };
+        window.handleDragLeave = function(e) { const targetRow = e.target.closest('.bookmark-row'); if (targetRow) { targetRow.classList.remove('drag-over-top', 'drag-over-bottom', 'drag-over-center'); } };
+        window.handleDragEnd = function(e) { document.querySelectorAll('.bookmark-row').forEach(el => { el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom', 'drag-over-center'); }); draggedBookmarkId = null; };
+        window.handleDrop = function(e, targetId) { e.stopPropagation(); e.preventDefault(); if (!draggedBookmarkId || draggedBookmarkId === targetId) return; document.querySelectorAll('.bookmark-row').forEach(el => el.classList.remove('drag-over-top', 'drag-over-bottom', 'drag-over-center')); const targetRow = e.target.closest('.bookmark-row'); if (!targetRow) return; const rect = targetRow.getBoundingClientRect(); const relY = e.clientY - rect.top; const height = rect.height; let action = 'nest'; if (relY < height * 0.25) action = 'before'; else if (relY > height * 0.75) action = 'after'; moveBookmarkNode(draggedBookmarkId, targetId, action); };
+
+        function moveBookmarkNode(srcId, targetId, action) {
+            const srcRes = findBookmarkParentAndIndex(savedBookmarks, srcId); if (!srcRes) return; 
+            if (isDescendant(savedBookmarks, srcId, targetId)) { window.showCustomModal("Không thể kéo cha vào trong con!", "Lỗi thao tác", "warning"); return; }
+            const nodeToMove = srcRes.parentList.splice(srcRes.index, 1)[0];
+            const targetRes = findBookmarkParentAndIndex(savedBookmarks, targetId);
+            if (!targetRes) { srcRes.parentList.splice(srcRes.index, 0, nodeToMove); return; }
+            if (action === 'before') { targetRes.parentList.splice(targetRes.index, 0, nodeToMove); } 
+            else if (action === 'after') { targetRes.parentList.splice(targetRes.index + 1, 0, nodeToMove); } 
+            else if (action === 'nest') { const targetNode = targetRes.parentList[targetRes.index]; if (!targetNode.children) targetNode.children = []; targetNode.children.push(nodeToMove); targetNode.expanded = true; }
+            saveBookData(); renderBookmarkTree();
+        }
+        function isDescendant(nodes, parentId, childId) { const parent = findBookmarkNode(nodes, parentId); if (!parent) return false; return findBookmarkNode(parent.children || [], childId) !== null; }
+
+        window.renderBookmarkTree = function() {
+            const c = document.getElementById('bookmark-tree'); c.innerHTML = '';
+            if (!savedBookmarks || savedBookmarks.length === 0) { c.innerHTML = '<div class="text-center py-4 text-xs text-gray-400 italic">Chưa có dấu trang.</div>'; return; }
+            function createNode(node, level) {
+                const div = document.createElement('div'); div.className = "bookmark-node group select-none";
+                const row = document.createElement('div'); 
+                const isActive = node.id === selectedBookmarkId;
+                const activeClass = isActive ? 'bookmark-active' : 'hover:bg-indigo-50';
+                row.className = `bookmark-row flex items-center p-1.5 rounded cursor-pointer transition relative border border-transparent ${activeClass}`;
+                row.style.paddingLeft = (level * 16 + 8) + 'px';
+                row.setAttribute('draggable', 'true');
+                row.ondragstart = (e) => handleDragStart(e, node.id);
+                row.ondragover = handleDragOver;
+                row.ondragleave = handleDragLeave;
+                row.ondragend = handleDragEnd;
+                row.ondrop = (e) => handleDrop(e, node.id);
+                
+                const hasChildren = node.children && node.children.length > 0;
+                
+                const toggleHtml = hasChildren 
+                    ? `<div class="w-4 h-4 flex items-center justify-center rounded hover:bg-gray-200 text-gray-500 shrink-0 transition-colors mr-0.5" onclick="toggleBookmarkExpand(event, '${node.id}')"><i class="fa-solid ${node.expanded ? 'fa-caret-down' : 'fa-caret-right'} text-[12px]"></i></div>`
+                    : `<div class="w-4 h-4 shrink-0 mr-0.5"></div>`; 
+                
+                const iconClass = hasChildren ? (node.expanded ? 'fa-folder-open text-yellow-500' : 'fa-folder text-yellow-500') : 'fa-bookmark text-indigo-400';
+                const iconHtml = `<i onclick="toggleBookmarkExpand(event, '${node.id}')" class="fa-solid ${iconClass} text-xs w-5 text-center cursor-pointer hover:scale-110 transition-transform"></i>`;
+                
+                row.innerHTML = `<div class="flex items-center flex-1 overflow-hidden" onclick="goToBookmark('${node.id}')">${toggleHtml}${iconHtml}<span class="text-xs text-gray-700 truncate font-medium flex-1 ml-0.5" title="${node.title}">${node.title}</span></div>`;
+                div.appendChild(row); c.appendChild(div);
+                if (hasChildren && node.expanded) node.children.forEach(child => createNode(child, level + 1));
+            }
+            savedBookmarks.forEach(bm => createNode(bm, 0));
+        };
+
+        window.actionOnSelectedBookmark = function(action) {
+            if (!selectedBookmarkId) {
+                window.showCustomModal("Vui lòng chọn một Bookmark để thực hiện thao tác!", "Chưa chọn", "warning");
+                return;
+            }
+            if (action === 'up') moveBookmark(null, selectedBookmarkId, -1);
+            else if (action === 'down') moveBookmark(null, selectedBookmarkId, 1);
+            else if (action === 'outdent') outdentBookmark(null, selectedBookmarkId);
+            else if (action === 'indent') indentBookmark(null, selectedBookmarkId);
+            else if (action === 'rename') renameBookmark(null, selectedBookmarkId);
+            else if (action === 'delete') promptDeleteBookmark(null, selectedBookmarkId);
+        };
+
+        function findBookmarkParentAndIndex(nodes, id, parent = null) { for (let i = 0; i < nodes.length; i++) { if (nodes[i].id === id) return { parentList: nodes, index: i, parentNode: parent }; if (nodes[i].children && nodes[i].children.length > 0) { const result = findBookmarkParentAndIndex(nodes[i].children, id, nodes[i]); if (result) return result; } } return null; }
+        window.toggleBookmarkExpand = function(e, id) { e.stopPropagation(); const node = findBookmarkNode(savedBookmarks, id); if(node && node.children && node.children.length > 0) { node.expanded = !node.expanded; renderBookmarkTree(); } }
+        
+        window.moveBookmark = function(e, id, offset) { if(e) e.stopPropagation(); const result = findBookmarkParentAndIndex(savedBookmarks, id); if (!result) return; const { parentList, index } = result; const newIndex = index + offset; if (newIndex >= 0 && newIndex < parentList.length) { [parentList[index], parentList[newIndex]] = [parentList[newIndex], parentList[index]]; saveBookData(); renderBookmarkTree(); } };
+        window.indentBookmark = function(e, id) { if(e) e.stopPropagation(); const result = findBookmarkParentAndIndex(savedBookmarks, id); if (!result) return; const { parentList, index } = result; if (index > 0) { const prevSibling = parentList[index - 1]; const node = parentList.splice(index, 1)[0]; if (!prevSibling.children) prevSibling.children = []; prevSibling.children.push(node); prevSibling.expanded = true; saveBookData(); renderBookmarkTree(); } };
+        window.outdentBookmark = function(e, id) { if(e) e.stopPropagation(); const result = findBookmarkParentAndIndex(savedBookmarks, id); if (!result || !result.parentNode) return; const { parentNode } = result; const grandResult = findBookmarkParentAndIndex(savedBookmarks, parentNode.id); let grandParentList = savedBookmarks; let parentIndex = -1; if (grandResult) { grandParentList = grandResult.parentList; parentIndex = grandResult.index; } else { const idx = savedBookmarks.indexOf(parentNode); if (idx !== -1) parentIndex = idx; } if (parentIndex !== -1) { const node = result.parentList.splice(result.index, 1)[0]; grandParentList.splice(parentIndex + 1, 0, node); saveBookData(); renderBookmarkTree(); } };
+        window.goToBookmark = function(id) { const node = findBookmarkNode(savedBookmarks, id); if (node) { pageNum = node.page; selectedBookmarkId = id; renderPage(pageNum); renderBookmarkTree(); } };
+        window.renameBookmark = function(e, id) { if(e) e.stopPropagation(); inputModalMode = 'renameBookmark'; inputModalTargetId = id; const n = findBookmarkNode(savedBookmarks, id); openInputModal('Đổi tên', 'fa-pen', 'Tên mới...'); document.getElementById('new-group-input').value = n.title; };
+        
+        window.promptDeleteBookmark = async function(e, id) { 
+            if(e) e.stopPropagation(); 
+            if (await window.showCustomModal("Bookmark này và tất cả các mục con bên trong sẽ bị xóa khỏi danh sách. Hành động này không thể hoàn tác.", "Xóa Bookmark này?", "error", true)) {
+                deleteBookmarkNode(savedBookmarks, id); 
+                if(selectedBookmarkId === id) selectedBookmarkId = null; 
+                updateBookmarkUI(); saveBookData(); renderBookmarkTree();
+            }
+        };
+        
+        function findBookmarkNode(nodes, id) { for (let n of nodes) { if (n.id === id) return n; if (n.children) { const f = findBookmarkNode(n.children, id); if (f) return f; } } return null; }
+        function deleteBookmarkNode(nodes, id) { const idx = nodes.findIndex(n => n.id === id); if (idx !== -1) { nodes.splice(idx, 1); return true; } for (let n of nodes) { if (n.children && deleteBookmarkNode(n.children, id)) return true; } return false; }
+        function updateBookmarkUI() { const btn = document.getElementById('btn-bookmark'); const isBm = (nodes, p) => nodes.some(n => n.page === p || (n.children && isBm(n.children, p))); if (isBm(savedBookmarks, pageNum)) { btn.innerHTML = '<i class="fa-solid fa-star"></i>'; btn.className = "w-8 h-8 rounded-full bg-yellow-50 border border-yellow-400 text-yellow-500 flex items-center justify-center transition shadow-sm"; } else { btn.innerHTML = '<i class="fa-regular fa-star"></i>'; btn.className = "w-8 h-8 rounded-full bg-white border border-gray-300 text-gray-400 hover:text-yellow-500 hover:border-yellow-400 flex items-center justify-center transition shadow-sm"; } }
+
+        // --- AUTH ---
+        document.getElementById('login-form').addEventListener('submit', (e) => { e.preventDefault(); auth.signInWithEmailAndPassword(document.getElementById('login-email').value, document.getElementById('login-password').value).catch(error => showAuthMessage(getAuthErrorMessage(error), 'text-red-500')); });
+        document.getElementById('register-form').addEventListener('submit', (e) => { e.preventDefault(); if (document.getElementById('reg-code').value.trim() !== TEACHER_CODE) return showAuthMessage('Mã giới thiệu sai!', 'text-red-500'); auth.createUserWithEmailAndPassword(document.getElementById('reg-email').value, document.getElementById('reg-password').value).catch(error => showAuthMessage(getAuthErrorMessage(error), 'text-red-500')); });
+        function showAuthMessage(msg, color) { const el = document.getElementById('auth-message'); el.innerHTML = msg; el.className = `mt-4 text-center text-sm font-bold ${color}`; el.classList.remove('hidden'); }
+        function getAuthErrorMessage(e) { return e.message; }
+
+        // --- INIT & EVENT LISTENERS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            setupEventListeners();
+            const savedSettings = localStorage.getItem('trungpdf_vocab_settings');
+            if (savedSettings) { vocabSettings = JSON.parse(savedSettings); }
+            applyListStyles();
+            const initAuth = async () => { if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token); else await auth.signInAnonymously(); };
+            initAuth();
+            
+            auth.onAuthStateChanged((user) => { 
+                if (user) { 
+                    currentUser = user; 
+                    document.getElementById('auth-screen').classList.add('hidden'); 
+                    document.getElementById('main-header').classList.remove('hidden'); 
+                    document.getElementById('main-content').classList.remove('hidden'); 
+                    document.getElementById('user-email-display').textContent = user.isAnonymous ? "Tài khoản Khách" : user.email; 
+                    setupLibraryListener();
+                } else { 
+                    currentUser = null; 
+                    document.getElementById('auth-screen').classList.remove('hidden'); 
+                    document.getElementById('main-header').classList.add('hidden'); 
+                    document.getElementById('main-content').classList.add('hidden'); 
+                    if(unsubscribeLibrary) { unsubscribeLibrary(); unsubscribeLibrary = null; }
+                } 
+            });
+        });
+
+        function setupEventListeners() {
+            document.getElementById('file-input').addEventListener('change', handleFileUpload);
+            document.getElementById('json-input').addEventListener('change', handleJsonUpload);
+            document.getElementById('btn-export-txt').addEventListener('click', exportToTxt);
+            document.getElementById('btn-export-json').addEventListener('click', exportToJson);
+            document.getElementById('btn-import-json').addEventListener('click', () => document.getElementById('json-input').click());
+            document.getElementById('btn-capture').addEventListener('click', toggleCaptureMode);
+            document.getElementById('mode-word').addEventListener('click', (e) => setTranslationType('word', e.target, document.getElementById('mode-sentence')));
+            document.getElementById('mode-sentence').addEventListener('click', (e) => setTranslationType('sentence', document.getElementById('mode-word'), e.target));
+            const overlay = document.getElementById('overlay'); overlay.addEventListener('mousedown', handleStart); overlay.addEventListener('touchstart', handleStart, { passive: false });
+            
+            document.addEventListener('keydown', (e) => { 
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; 
+                if (document.getElementById('tab-bookmarks').classList.contains('sidebar-tab-active') && selectedBookmarkId) {
+                    if (e.key === 'ArrowUp') { e.preventDefault(); if (e.shiftKey) { moveBookmark(null, selectedBookmarkId, -1); } else { navigateBookmark(-1); } }
+                    if (e.key === 'ArrowDown') { e.preventDefault(); if (e.shiftKey) { moveBookmark(null, selectedBookmarkId, 1); } else { navigateBookmark(1); } }
+                    if (e.key === 'ArrowLeft') { e.preventDefault(); outdentBookmark(null, selectedBookmarkId); }
+                    if (e.key === 'ArrowRight') { e.preventDefault(); indentBookmark(null, selectedBookmarkId); }
+                    if (e.key === 'Delete') { e.preventDefault(); promptDeleteBookmark(null, selectedBookmarkId); }
+                }
+                if (e.code === 'Space' && !document.getElementById('auth-screen').style.display && document.getElementById('global-alert-modal').classList.contains('hidden')) { e.preventDefault(); toggleCaptureMode(); } 
+                if (e.key === 'Escape') { closeAIModal(); closeLibrary(); closeStudyModal(); closeGroupModal(); closeSettingsModal(); closeSaveToLibraryModal(); closeOpenBookModal(); 
+                    if(!document.getElementById('global-alert-modal').classList.contains('hidden')) {
+                        // Optional: bind escape to close alert, but skipping for strictly awaiting promises
+                    }
+                } 
+            });
+        }
+
+        function getVisibleBookmarkList(nodes = savedBookmarks, list = []) {
+            for (let node of nodes) {
+                list.push(node);
+                if (node.children && node.children.length > 0 && node.expanded) {
+                    getVisibleBookmarkList(node.children, list);
+                }
+            }
+            return list;
+        }
+
+        function navigateBookmark(offset) {
+            const flatList = getVisibleBookmarkList();
+            const currentIndex = flatList.findIndex(n => n.id === selectedBookmarkId);
+            if (currentIndex === -1) return;
+            const nextIndex = currentIndex + offset;
+            if (nextIndex >= 0 && nextIndex < flatList.length) {
+                const nextNode = flatList[nextIndex];
+                goToBookmark(nextNode.id);
+                setTimeout(() => {
+                    const activeEl = document.querySelector('.bookmark-active');
+                    if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 50);
+            }
+        }
+
+        function renderBookshelf() { 
+            const list = document.getElementById('book-list'); list.innerHTML = ''; 
+            if (sessionBooks.length === 0 && cloudLibraryBooks.length === 0) { 
+                list.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">Chưa có sách nào.</div>'; return; 
+            } 
+            
+            cloudLibraryBooks.forEach(book => { 
+                const div = document.createElement('div'); 
+                div.className = `flex items-center justify-between p-3 bg-white border rounded shadow-sm hover:border-indigo-300 transition-all cursor-pointer group ${book.id === currentBookId ? 'border-indigo-500 bg-indigo-50' : ''}`; 
+                div.onclick = () => promptOpenCloudBook(book.id, book.name, book.fileName); 
+                div.innerHTML = `<div class="flex items-center gap-3 overflow-hidden"><div class="w-8 h-10 bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center rounded shrink-0"><i class="fa-solid fa-laptop-file"></i></div><div class="min-w-0"><div class="font-bold text-gray-700 text-sm truncate">${book.name}</div><div class="text-[10px] text-gray-400 truncate max-w-full">${book.fileName}</div></div></div><button onclick="deleteCloudBook(event, '${book.id}')" class="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fa-solid fa-trash"></i></button>`; 
+                list.appendChild(div); 
+            });
+
+            sessionBooks.forEach(book => { 
+                const div = document.createElement('div'); 
+                div.className = `flex items-center justify-between p-3 bg-white border rounded shadow-sm hover:border-indigo-300 transition-all cursor-pointer group ${book.id === currentBookId ? 'border-indigo-500 bg-indigo-50' : ''}`; 
+                div.onclick = () => switchBook(book.id); 
+                div.innerHTML = `<div class="flex items-center gap-3 overflow-hidden"><div class="w-8 h-10 bg-gray-50 text-gray-500 border border-gray-200 flex items-center justify-center rounded shrink-0"><i class="fa-solid fa-file-pdf"></i></div><div class="min-w-0"><div class="font-bold text-gray-700 text-sm truncate">${book.name}</div><div class="text-[10px] text-gray-400">Mở tạm thời</div></div></div><button onclick="deleteBookFromLibrary(event, '${book.id}')" class="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fa-solid fa-trash"></i></button>`; 
+                list.appendChild(div); 
+            }); 
+        }
+
+        async function switchBook(id) { 
+            if (unsubscribeVocab) { unsubscribeVocab(); unsubscribeVocab = null; } 
+            const newBook = sessionBooks.find(b => b.id === id); 
+            if (newBook) { 
+                currentBookId = id; 
+                currentPdfData = newBook.data; 
+                document.getElementById('current-book-name').textContent = newBook.name; 
+                setupFirestoreListener(id); 
+                await openBookData(currentPdfData.slice(0), newBook.pageNum || 1); 
+                closeLibrary(); 
+            } 
+        }
+
+        function setupFirestoreListener(bookId) { if (!currentUser) return; const docRef = db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('vocab_books').doc(bookId); document.getElementById('word-list').innerHTML = '<div class="text-center py-4 text-gray-400"><i class="fa-solid fa-sync fa-spin"></i> Đang tải dữ liệu...</div>'; unsubscribeVocab = docRef.onSnapshot((doc) => { if (doc.exists) { const data = doc.data(); savedWords = data.words || []; savedBookmarks = data.bookmarks || []; } else { savedWords = []; savedBookmarks = []; } const b = sessionBooks.find(x => x.id === bookId); if (b) { b.vocab = savedWords; b.bookmarks = savedBookmarks; } renderList(); renderBookshelf(); updateGroupFilterOptions(); updateBookmarkUI(); renderBookmarkTree(); }, (error) => console.error(error)); }
+        function saveBookData() { if (!currentUser || !currentBookId) return; const docRef = db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('vocab_books').doc(currentBookId); docRef.set({ lastUpdated: firebase.firestore.FieldValue.serverTimestamp(), bookName: document.getElementById('current-book-name').textContent, words: savedWords, bookmarks: savedBookmarks }, { merge: true }); }
+        function saveVocabToFirestore() { saveBookData(); }
+
+        window.deleteWord = function(id) { savedWords = savedWords.filter(w => w.id !== id); renderList(); saveVocabToFirestore(); };
+
+        window.clearAllWords = async function() {
+            if (savedWords.length === 0) return window.showCustomModal("Danh sách đã trống!", "Thông báo", "info");
+            
+            let msg = currentGroupFilter === 'all' 
+                ? "Bạn có chắc chắn muốn xóa TOÀN BỘ từ vựng?" 
+                : `Bạn có chắc chắn muốn xóa tất cả từ vựng trong nhóm "${currentGroupFilter}"?`;
+                
+            if (await window.showCustomModal(msg, "Xác nhận xóa", "warning", true)) {
+                if (currentGroupFilter === 'all') {
+                    savedWords = [];
+                } else {
+                    savedWords = savedWords.filter(w => (w.group || 'Chung') !== currentGroupFilter);
+                }
+                renderList();
+                saveVocabToFirestore();
+                updateGroupFilterOptions();
+            }
+        };
+
+        window.sortVocab = function(order) {
+            if (savedWords.length < 2) return;
+            if (order === 'asc') {
+                savedWords.sort((a, b) => a.id - b.id); // Sắp xếp cũ -> mới
+            } else {
+                savedWords.sort((a, b) => b.id - a.id); // Sắp xếp mới -> cũ
+            }
+            renderList();
+            saveVocabToFirestore();
+        };
+
+        window.toggleEdit = function(id) { 
+            const el = document.getElementById(`item-${id}`); 
+            const tEl = el.querySelector('.word-text'); 
+            const mEl = el.querySelector('.word-meaning');
+            const pEl = el.querySelector('.word-pinyin');
+            
+            const word = savedWords.find(w => w.id === id);
+            const currentText = word.text || ''; 
+            const currentPinyin = word.pinyin || '';
+            const currentMeaning = word.meaning || '';
+            const currentGroup = word.group || 'Chung'; 
+            const currentPos = word.pos || '';
+            
+            const uniqueGroups = [...new Set(savedWords.map(w => w.group || 'Chung'))]; 
+            const dataListId = `groups-${id}`; 
+            let datalistHtml = `<datalist id="${dataListId}">`; 
+            uniqueGroups.forEach(g => datalistHtml += `<option value="${g}">`); 
+            datalistHtml += `</datalist>`;
+            
+            // THÊM DÒNG NÀY: Xóa class .word-text để ngăn các cài đặt kích thước/font chữ custom áp dụng vào form
+            tEl.className = "w-full block"; 
+            
+            tEl.innerHTML = `<div class="flex flex-col gap-2 w-full mt-1 mb-2 text-left">
+                <div>
+                    <label class="text-[11px] text-gray-500 font-bold uppercase mb-0.5 block font-sans" style="line-height: normal;">Hán tự</label>
+                    <input type="text" id="in-txt-${id}" class="w-full border border-gray-300 p-1.5 rounded text-xl  focus:ring-1 focus:ring-indigo-500 font-sans text-gray-800" style="line-height: normal;" value="${currentText.replace(/"/g, '&quot;')}" placeholder="Hán tự">
+                </div>
+                <div>
+                    <label class="text-[11px] text-gray-500 font-bold uppercase mb-0.5 block font-sans" style="line-height: normal;">Pinyin</label>
+                    <input type="text" id="in-py-${id}" oninput="window.formatPinyinInput(this)" class="w-full border border-gray-300 p-1.5 rounded text-sm font-mono text-indigo-600 focus:ring-1 focus:ring-indigo-500" style="line-height: normal;" value="${currentPinyin.replace(/"/g, '&quot;')}" placeholder="Pinyin">
+                </div>
+                <div>
+                    <label class="text-[11px] text-gray-500 font-bold uppercase mb-0.5 block font-sans" style="line-height: normal;">Nghĩa</label>
+                    <textarea id="in-mean-${id}" class="w-full border border-gray-300 p-1.5 rounded text-sm text-gray-700 focus:ring-1 focus:ring-indigo-500 font-sans" style="line-height: normal;" rows="2" placeholder="Nghĩa tiếng Việt">${currentMeaning}</textarea>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="flex flex-col flex-1">
+                        <label class="text-[11px] text-gray-500 font-bold uppercase mb-0.5 block font-sans" style="line-height: normal;">Nhóm</label>
+                        <input type="text" list="${dataListId}" id="in-grp-${id}" class="w-full border border-gray-300 p-1.5 rounded text-sm font-sans text-gray-800 focus:ring-1 focus:ring-indigo-500" style="line-height: normal;" value="${currentGroup}">${datalistHtml}
+                    </div>
+                    <div class="flex flex-col w-[70px]">
+                        <label class="text-[11px] text-gray-500 font-bold uppercase mb-0.5 block font-sans" style="line-height: normal;">Từ loại</label>
+                        <input type="text" id="in-pos-${id}" class="w-full border border-gray-300 p-1.5 rounded text-sm font-sans text-gray-800 focus:ring-1 focus:ring-indigo-500" style="line-height: normal;" placeholder="v, n..." value="${currentPos}">
+                    </div>
+                </div>
+                <div class="flex gap-2 justify-end mt-2">
+                    <button onclick="renderList()" class="px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 text-xs font-bold rounded transition-colors font-sans" style="line-height: normal;">Hủy</button>
+                    <button onclick="saveEdit(${id})" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded shadow-sm transition-colors font-sans" style="line-height: normal;">Lưu lại</button>
+                </div>
+            </div>`;
+            
+            // Tắt sự kiện click Highlight trong lúc đang edit
+            tEl.onclick = null; 
+            
+            if(mEl) mEl.classList.add('hidden');
+            if(pEl) pEl.classList.add('hidden');
+        };
+
+        window.saveEdit = function(id) { 
+            const txt = document.getElementById(`in-txt-${id}`).value.trim(); 
+            const py = document.getElementById(`in-py-${id}`).value.trim(); 
+            const mean = document.getElementById(`in-mean-${id}`).value.trim(); 
+            const grp = document.getElementById(`in-grp-${id}`).value.trim() || 'Chung'; 
+            const pos = document.getElementById(`in-pos-${id}`) ? document.getElementById(`in-pos-${id}`).value.trim() : '';
+            
+            const it = savedWords.find(i => i.id === id); 
+            if (it && txt) { 
+                let needsReTrans = false; 
+                if (txt !== it.text) { 
+                    it.text = txt; 
+                    it.status = 'processing'; 
+                    needsReTrans = true; 
+                } 
+                it.pinyin = py;
+                it.meaning = mean;
+                it.group = grp; 
+                it.pos = pos; 
+                
+                renderList(); 
+                updateGroupFilterOptions(); 
+                saveVocabToFirestore(); 
+                
+                if (needsReTrans) callGemini(id, txt, it.type); 
+            } 
+        };
+
+        window.formatPinyinInput = function(input) {
+            const toneMap = {
+                a: ['ā', 'á', 'ǎ', 'à'], e: ['ē', 'é', 'ě', 'è'], i: ['ī', 'í', 'ǐ', 'ì'],
+                o: ['ō', 'ó', 'ǒ', 'ò'], u: ['ū', 'ú', 'ǔ', 'ù'], v: ['ǖ', 'ǘ', 'ǚ', 'ǜ'], ü: ['ǖ', 'ǘ', 'ǚ', 'ǜ']
+            };
+            
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            const oldVal = input.value;
+            
+            let text = oldVal.replace(/([a-zA-ZüÜ]+)([1-4])/g, function(match, word, tone) {
+                const t = parseInt(tone) - 1;
+                word = word.replace(/v/g, 'ü'); // Tự động đổi v thành ü
+                
+                // Quy tắc đặt dấu Pinyin
+                if (word.includes('a')) return word.replace('a', toneMap['a'][t]);
+                if (word.includes('e')) return word.replace('e', toneMap['e'][t]);
+                if (word.includes('ou')) return word.replace('o', toneMap['o'][t]);
+                
+                // Các trường hợp còn lại: dấu nằm ở nguyên âm cuối cùng
+                const vowels = word.match(/[aeiouü]/g);
+                if (vowels) {
+                    const lastVowel = vowels[vowels.length - 1];
+                    const lastIndex = word.lastIndexOf(lastVowel);
+                    return word.substring(0, lastIndex) + toneMap[lastVowel][t] + word.substring(lastIndex + 1);
+                }
+                return word;
+            });
+            
+            // Xử lý thanh nhẹ (số 5 hoặc 0) và thay v thành ü nếu không có dấu
+            text = text.replace(/([a-zA-ZüÜ]+)[50]/g, function(match, word) {
+                return word.replace(/v/g, 'ü');
+            });
+
+            if (oldVal !== text) {
+                input.value = text;
+                // Giữ nguyên vị trí con trỏ chuột không bị nhảy
+                const lenDiff = oldVal.length - text.length;
+                input.setSelectionRange(start - lenDiff, end - lenDiff);
+            }
+        };
+
+        window.speakText = function(t) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); const v = window.speechSynthesis.getVoices().find(x => x.lang.includes('zh')); if(v) u.voice=v; u.lang='zh-CN'; u.rate=0.9; window.speechSynthesis.speak(u); };
+        function renderItemStatus(id, text, statusMsg) { const el = document.getElementById(`item-${id}`); if(el) { el.querySelector('.word-text').textContent = text; el.querySelector('.word-meaning').textContent = statusMsg; } }
+        
+        window.getPosTooltip = function(pos) {
+            const map = { 'n':'Danh từ', 'v':'Động từ', 'adj':'Tính từ', 'a':'Tính từ', 'adv':'Phó từ', 'ad':'Phó từ', 'num':'Số từ', 'm':'Số từ', 'mw':'Lượng từ', 'q':'Từ chỉ số lượng', 'prep':'Giới từ', 'p':'Giới từ', 'pron':'Đại từ', 'r':'Đại từ', 'conj':'Liên từ', 'c':'Liên từ', 'part':'Trợ từ', 'u':'Trợ từ', 'int':'Thán từ', 'e':'Thán từ', 'aux':'Trợ động từ', 'pref':'Tiền tố', 'suff':'Hậu tố', 'ono':'Từ tượng thanh', 'idiom':'Thành ngữ', 'i':'Thành ngữ' };
+            return map[pos.toLowerCase().trim()] || pos.trim();
+        };
+
+        function updateGroupFilterOptions() {
+            const select = document.getElementById('group-filter'); let groups = new Set(savedWords.map(w => w.group || 'Chung')); groups.add('Chung'); if (currentGroupFilter !== 'all') { groups.add(currentGroupFilter); }
+            const uniqueGroups = [...groups].sort(); const currentSelection = select.value;
+            let html = `<option value="all">Tất cả nhóm</option>`; uniqueGroups.forEach(g => { const isSelected = g === currentGroupFilter; html += `<option value="${g}" ${isSelected ? 'selected' : ''}>${g}</option>`; }); select.innerHTML = html;
+            toggleRenameGroupBtn(); 
+        }
+
+        window.scrollToSidebarWord = function(id) {
+            const word = savedWords.find(w => w.id === id);
+            if (!word) return;
+            
+            // Nếu từ vựng nằm ở nhóm khác, tự động chuyển bộ lọc về 'Tất cả nhóm' để hiển thị
+            if (currentGroupFilter !== 'all' && (word.group || 'Chung') !== currentGroupFilter) {
+                currentGroupFilter = 'all';
+                document.getElementById('group-filter').value = 'all';
+                renderList();
+            }
+            
+            const el = document.getElementById(`item-${id}`);
+            if (el) {
+                // Cuộn tới vị trí thẻ từ vựng
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Hiệu ứng nhấp nháy
+                el.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50', 'scale-[1.02]', 'z-10');
+                setTimeout(() => {
+                    el.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50', 'scale-[1.02]', 'z-10');
+                }, 1500);
+            }
+        };
+
+        window.toggleHighlights = function() {
+            showHighlights = !showHighlights;
+            const btn = document.getElementById('btn-toggle-highlights');
+            if (showHighlights) {
+                btn.classList.add('bg-indigo-100', 'text-indigo-600');
+                btn.classList.remove('text-gray-500');
+            } else {
+                btn.classList.remove('bg-indigo-100', 'text-indigo-600');
+                btn.classList.add('text-gray-500');
+            }
+            if (window.drawSavedHighlights) window.drawSavedHighlights();
+        };
+
+        window.drawSavedHighlights = function() {
+            if (!pdfDoc) return;
+            const wrapper = document.getElementById('canvas-wrapper');
+            if(!wrapper) return;
+            
+            // Xóa các vùng highlight cũ
+            wrapper.querySelectorAll('.saved-word-highlight').forEach(el => el.remove());
+            
+            // Vẽ lại các vùng highlight cho trang hiện tại
+            savedWords.forEach(word => {
+                if (word.page === pageNum && word.rect) {
+                    const box = document.createElement('div');
+                    // Cập nhật: Sử dụng class custom CSS tạo động bằng JS để quản lý màu
+                    const activeClass = showHighlights ? 'highlight-on' : '';
+                    box.className = `saved-word-highlight group absolute cursor-pointer bg-transparent rounded-sm transition-colors z-[40] ${activeClass}`;
+                    // Sử dụng % giúp vùng chọn không bị lệch khi zoom PDF
+                    box.style.left = (word.rect.x * 100) + '%';
+                    box.style.top = (word.rect.y * 100) + '%';
+                    box.style.width = (word.rect.w * 100) + '%';
+                    box.style.height = (word.rect.h * 100) + '%';
+                    
+                    // Tạo nội dung Tooltip chứa Hán tự, Pinyin và Nghĩa
+                    let tooltipText = word.text || 'Đang xử lý...';
+                    if (word.pinyin) tooltipText += ` | ${word.pinyin}`;
+                    if (word.meaning) tooltipText += `\n${word.meaning}`;
+                    tooltipText += `\n(Nhấn để xem vị trí)`;
+                    
+                    // TẠO CUSTOM TOOLTIP thay vì dùng thuộc tính title
+                    const tt = document.createElement('div');
+                    
+                    // Logic thông minh định vị tooltip
+                    // Mặc định: hiện ở dưới góc phải (top-left tooltip chạm bottom-right từ)
+                    let positionClasses = 'top-full left-full mt-1 ml-1'; 
+                    // Nếu từ vựng nằm quá sát rìa phải (vượt qua 60% chiều ngang trang PDF)
+                    if (word.rect.x > 0.6) {
+                        // Hiện ở dưới góc trái (top-right tooltip chạm bottom-left từ)
+                        positionClasses = 'top-full right-full mt-1 mr-1';
+                    }
+
+                    tt.className = `hidden group-hover:block absolute ${positionClasses} bg-white text-black border border-gray-800 text-[16px] p-2.5 rounded shadow-lg whitespace-pre-line w-max max-w-[250px] z-[100] pointer-events-none text-left font-sans leading-relaxed`;
+                    tt.textContent = tooltipText;
+                    box.appendChild(tt);
+
+                    box.onclick = (e) => {
+                        e.stopPropagation();
+                        scrollToSidebarWord(word.id);
+                    };
+                    wrapper.appendChild(box);
+                }
+            });
+        };
+
+        function renderList() {
+            const list = document.getElementById('word-list'); 
+            const visibleWords = currentGroupFilter === 'all' ? savedWords : savedWords.filter(w => (w.group || 'Chung') === currentGroupFilter);
+            document.getElementById('saved-count').textContent = visibleWords.length; list.innerHTML = '';
+            if (visibleWords.length === 0) { const msg = currentGroupFilter !== 'all' ? `Nhóm "${currentGroupFilter}" chưa có từ nào.<br>Hãy chụp từ mới để thêm vào đây!` : 'Danh sách trống'; list.innerHTML = `<div class="text-center py-10 text-gray-400 text-sm italic">${msg}</div>`; if (document.activeElement.id !== 'group-filter') updateGroupFilterOptions(); return; }
+            visibleWords.forEach(word => {
+                const isProc = word.status === 'processing'; const isErr = word.status === 'error';
+                const div = document.createElement('div'); div.id = `item-${word.id}`; div.className = `p-3 rounded-lg border shadow-sm relative transition-all group bg-white hover:border-indigo-300 hover:shadow-md ${isProc ? 'processing-item border-blue-200' : 'border-gray-100'}`;
+                const groupBadge = `<span class="inline-block bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0.5 rounded border border-gray-200 mr-1 mb-1">${word.group || 'Chung'}</span>`;
+                
+                if (isProc) { div.innerHTML = `<div class="flex items-center gap-3"><div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0"></div><div class="flex-1"><div class="word-text font-bold truncate">${word.text||'Đang đọc...'}</div><div class="word-meaning text-xs text-blue-500">Đang dịch...</div></div></div>`; }
+                else { 
+                    const safeText = word.text.replace(/'/g, "\\'"); 
+                    div.innerHTML = `
+                        <div class="pr-8">
+                            <div class="mb-1">${groupBadge}</div>
+                            <div class="flex items-start justify-between gap-2 mb-1">
+                                <div class="word-text font-bold text-gray-800 ${word.type==='sentence'?'text-sm':'text-lg font-serif'} cursor-pointer hover:text-indigo-600 transition-colors" onclick="highlightWord(${word.id})" title="Xem vị trí (P.${word.page})">${word.text} <span class="text-[10px] text-gray-400 font-sans ml-1 bg-gray-100 px-1 rounded">P.${word.page||'?'}</span></div>
+                            </div>
+                            ${word.pinyin ? `<div class="word-pinyin text-xs font-mono text-indigo-600 mb-1 flex flex-wrap items-center gap-1"><span>${word.pinyin}</span>${word.pos ? word.pos.split(',').map(p => `<div class="relative group/tooltip inline-block"><span class="px-1 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-500 inline-block leading-none cursor-help">${p.trim().toLowerCase()}</span><div class="hidden group-hover/tooltip:block absolute top-full right-0 mt-1.5 bg-white text-black border border-gray-800 text-[13px] px-2 py-1 rounded shadow-md whitespace-nowrap z-[100] pointer-events-none font-sans font-normal">${window.getPosTooltip(p)}</div></div>`).join('') : ''}</div>` : ''}
+                            <div class="word-meaning text-sm text-gray-600 ${isErr?'text-red-500':''} mb-2">${word.meaning}</div>
+                        </div>
+                        <div class="flex gap-1 border-t pt-2 mt-2 border-dashed w-full overflow-hidden">
+                            <button onclick="askAI(${word.id}, 'example')" class="flex-1 text-[11px] sm:text-xs flex justify-center items-center gap-1 text-gray-500 hover:text-green-600 bg-gray-50 hover:bg-green-50 py-1.5 rounded transition-colors whitespace-nowrap"><i class="fa-regular fa-lightbulb"></i> <span class="truncate">Ví dụ</span></button>
+                            <button onclick="askAI(${word.id}, 'grammar')" class="flex-1 text-[11px] sm:text-xs flex justify-center items-center gap-1 text-gray-500 hover:text-purple-600 bg-gray-50 hover:bg-purple-50 py-1.5 rounded transition-colors whitespace-nowrap"><i class="fa-solid fa-book-open"></i> <span class="truncate">Ngữ pháp</span></button>
+                            <button onclick="askAI(${word.id}, 'solve')" class="flex-1 text-[11px] sm:text-xs flex justify-center items-center gap-1 text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 py-1.5 rounded transition-colors whitespace-nowrap"><i class="fa-solid fa-wand-magic-sparkles"></i> <span class="truncate">Giải bài</span></button>
+                            <button onclick="openAnimationModalFromID('${word.id}')" class="flex-1 text-[11px] sm:text-xs flex justify-center items-center gap-1 text-gray-500 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 py-1.5 rounded transition-colors whitespace-nowrap"><i class="fa-solid fa-pen-nib"></i> <span class="truncate">Tập viết</span></button>
+                        </div>
+                        <div class="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="speakText('${safeText}')" class="text-gray-300 hover:text-indigo-600 p-1" title="Nghe"><i class="fa-solid fa-volume-high"></i></button>
+                            <button onclick="toggleEdit(${word.id})" class="text-gray-300 hover:text-blue-500 p-1" title="Sửa"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteWord(${word.id})" class="text-gray-300 hover:text-red-500 p-1"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    `; 
+                }
+                list.appendChild(div);
+            });
+            if (document.activeElement.id !== 'group-filter') updateGroupFilterOptions();
+            if (window.drawSavedHighlights) window.drawSavedHighlights();
+        }
+
+        window.openGeneralAIChat = function() { const m = document.getElementById('ai-modal'); const c = document.getElementById('ai-content'); m.classList.remove('hidden'); if (c.innerHTML.trim() === '') appendAIMessage("Chào bạn! Tôi là AI hỗ trợ tiếng Trung. Bạn có thắc mắc gì về ngữ pháp, từ vựng hay cần dịch thuật không?"); document.getElementById('ai-input').focus(); };
+        window.askAI = function(id, type) {
+            const item = savedWords.find(i => i.id === id); if (!item) return; document.getElementById('ai-modal').classList.remove('hidden');
+            let p = "", d = "";
+            if (type === 'example') { d = `Cho ví dụ về: ${item.text}`; p = `Tạo 3 ví dụ đơn giản bằng tiếng Trung cho từ/câu: "${item.text}". Yêu cầu bắt buộc: Mỗi ví dụ phải có 3 phần: Hán tự, Pinyin, và Nghĩa tiếng Việt. Trình bày bằng Markdown danh sách.`; }
+            else if (type === 'grammar') { d = `Giải thích ngữ pháp: ${item.text}`; p = `Giải thích ngữ pháp hoặc cách dùng của từ/câu: "${item.text}" bằng Tiếng Việt. Giải thích ngắn gọn, dễ hiểu. Trả về định dạng Markdown.`; }
+            appendUserMessage(d); submitToGemini(p);
+        };
+        window.handleAIEnter = function(e) { if (e.key === 'Enter') sendAIQuery(); };
+        window.sendAIQuery = function() { const i = document.getElementById('ai-input'); const t = i.value.trim(); if (!t) return; appendUserMessage(t); submitToGemini(t); i.value = ''; };
+        function appendUserMessage(t) { const c = document.getElementById('ai-content'); const m = document.createElement('div'); m.className = 'chat-msg-user'; m.textContent = t; c.appendChild(m); c.scrollTop = c.scrollHeight; }
+        function appendAIMessage(h) { const c = document.getElementById('ai-content'); const m = document.createElement('div'); m.className = 'chat-msg-ai prose prose-sm max-w-none'; m.innerHTML = h; c.appendChild(m); c.scrollTop = c.scrollHeight; }
+function submitToGemini(p) {
+    const c = document.getElementById('ai-content'); const lid = 'l-' + Date.now();
+    const lm = document.createElement('div'); lm.id = lid; lm.className = 'chat-msg-ai text-gray-400 italic flex items-center gap-2'; lm.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i> AI đang suy nghĩ...'; c.appendChild(lm); c.scrollTop = c.scrollHeight;
+    
+    // Sử dụng endpoint của DeepSeek
+    fetch(`https://api.deepseek.com/chat/completions`, { 
+        method: 'POST', 
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}` // Thêm header Authorization
+        }, 
+        body: JSON.stringify({ 
+            model: "deepseek-chat", // Hoặc deepseek-reasoner tùy nhu cầu
+            messages: [
+                { role: "system", content: "Bạn là trợ lý AI hỗ trợ học tiếng Trung." },
+                { role: "user", content: p }
+            ]
+        }) 
+    })
+    .then(r => r.json())
+    .then(d => { 
+        document.getElementById(lid).remove(); 
+        appendAIMessage(marked.parse(d.choices[0].message.content)); // Parser của DeepSeek
+    })
+    .catch(e => { 
+        document.getElementById(lid).remove(); 
+        appendAIMessage(`<span class="text-red-500">Lỗi: ${e.message}</span>`); 
+    });
+}
+async function callGemini(id, txt, type) { 
+    try { 
+        const p = `Dịch ${type==='word'?'từ':'câu'} tiếng Trung sau sang tiếng Việt: "${txt}". Quy tắc Pinyin: nếu là từ ghép thì viết liền không khoảng trắng (ví dụ: xuéxiào), nếu là câu hoặc các từ rời rạc thì viết tách các từ. Bắt buộc trả về nghĩa Tiếng Việt. Trả về đúng định dạng JSON: {"pinyin": "...", "meaning": "${type==='word'?'ngắn gọn, tiếng Việt':'mượt mà, tiếng Việt'}", "pos": "${type==='word'?'Từ loại (dùng mã: n=danh từ, v=động từ, adj=tính từ, pron=đại từ, adv=phó từ, prep=giới từ, mw=lượng từ, num=số từ, conj=liên từ, int=thán từ, aux=trợ động từ, part=trợ từ, q=từ chỉ số lượng, pref=tiền tố, suff=hậu tố, ono=từ tượng thanh. Tách bằng dấu phẩy nếu nhiều, ví dụ: v, n). Để trống nếu không phải 1 từ':''}"}`; 
+        
+        const r = await fetch(`https://api.deepseek.com/chat/completions`, { 
+            method: 'POST', 
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            }, 
+            body: JSON.stringify({ 
+                model: "deepseek-chat",
+                messages: [
+                    { role: "system", content: "Bạn là hệ thống dịch thuật tiếng Trung sang tiếng Việt. Bạn chỉ được phép trả về duy nhất một đối tượng JSON, không kèm bất kỳ văn bản, giải thích hay markdown code block nào khác." },
+                    { role: "user", content: p }
+                ],
+                response_format: { type: "json_object" } // Bắt buộc DeepSeek trả về JSON
+            }) 
+        }); 
+        
+        const d = await r.json(); 
+        let responseText = d.choices[0].message.content;
+        
+        // Dọn dẹp phòng trường hợp AI vẫn nhét ```json ... ``` vào kết quả
+        responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        const j = JSON.parse(responseText); 
+        const it = savedWords.find(i => i.id === id); 
+        if (it) { 
+            it.pinyin = j.pinyin||""; 
+            it.meaning = j.meaning||""; 
+            it.pos = j.pos||""; 
+            it.status = 'done'; 
+            renderList(); 
+            saveVocabToFirestore(); 
+        } 
+    } catch (e) { 
+        console.error("Lỗi AI Dịch thuật:", e); 
+    } 
+}
+
+        window.openStudyModal = function() { 
+            refreshStudyList(); 
+            if (studyList.length === 0) { 
+                if(isWeakFilterActive) {
+                    window.showCustomModal("Tuyệt vời! Bạn đã thuộc hết các từ trong nhóm này.", "Hoàn thành", "success");
+                    return;
+                }
+                window.showCustomModal("Không có từ vựng nào đã dịch xong để học!", "Thông báo", "warning");
+                return;
+            } 
+            document.getElementById('study-modal').classList.remove('hidden'); 
+            document.getElementById('study-subtitle').textContent = currentGroupFilter === 'all' ? 'Tất cả từ vựng' : `Nhóm: ${currentGroupFilter}`; 
+            updateStudyHeaderProgress(); 
+            switchTab('flashcard'); 
+        };
+        
+        function refreshStudyList() { const baseList = currentGroupFilter === 'all' ? savedWords : savedWords.filter(w => (w.group || 'Chung') === currentGroupFilter); let validWords = baseList.filter(w => w.status === 'done'); if (isWeakFilterActive) validWords = validWords.filter(w => !w.memorized); studyList = validWords; currentListPage = 1; if (currentStudyIndex >= studyList.length) currentStudyIndex = 0; }
+        
+        window.toggleWeakFilter = function() { 
+            isWeakFilterActive = document.getElementById('filterWeakWords').checked; 
+            refreshStudyList(); 
+            if (studyList.length === 0 && isWeakFilterActive) {
+                window.showCustomModal("Tuyệt vời! Không có từ nào chưa thuộc trong nhóm này.", "Thành tích", "success");
+            }
+            updateStudyHeaderProgress(); 
+            if(!document.getElementById('flashcardView').classList.contains('hidden')) renderFlashcardUI(); 
+            if(!document.getElementById('listView').classList.contains('hidden')) renderStudyListView(); 
+        };
+        
+        function updateStudyHeaderProgress() { const baseList = currentGroupFilter === 'all' ? savedWords : savedWords.filter(w => (w.group || 'Chung') === currentGroupFilter); const validWords = baseList.filter(w => w.status === 'done'); const total = validWords.length; const memorized = validWords.filter(w => w.memorized).length; const percent = total === 0 ? 0 : Math.round((memorized / total) * 100); const el = document.getElementById('study-total-progress'); el.textContent = `${percent}%`; if(percent >= 100) el.className = "w-12 h-12 flex items-center justify-center text-xs font-bold bg-green-100 rounded-full text-green-600"; else if(percent >= 50) el.className = "w-12 h-12 flex items-center justify-center text-xs font-bold bg-blue-100 rounded-full text-blue-600"; else el.className = "w-12 h-12 flex items-center justify-center text-xs font-bold bg-gray-100 rounded-full text-gray-500"; }
+        window.closeStudyModal = function() { document.getElementById('study-modal').classList.add('hidden'); };
+        window.switchTab = function(tabName) { ['tabFlashcard', 'tabList', 'tabQuiz'].forEach(id => document.getElementById(id).className = "flex-1 py-2 rounded-lg bg-transparent text-gray-500 hover:text-gray-700 transition-all duration-300"); ['flashcardView', 'listView', 'quizView'].forEach(id => { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }); if (tabName === 'flashcard') { document.getElementById('tabFlashcard').className = "flex-1 py-2 rounded-lg bg-white text-indigo-600 shadow-sm transition-all duration-300"; document.getElementById('flashcardView').classList.remove('hidden'); document.getElementById('flashcardView').classList.add('flex'); renderFlashcardUI(); } else if (tabName === 'list') { document.getElementById('tabList').className = "flex-1 py-2 rounded-lg bg-white text-indigo-600 shadow-sm transition-all duration-300"; document.getElementById('listView').classList.remove('hidden'); document.getElementById('listView').classList.add('flex'); renderStudyListView(); } else if (tabName === 'quiz') { document.getElementById('tabQuiz').className = "flex-1 py-2 rounded-lg bg-white text-indigo-600 shadow-sm transition-all duration-300"; document.getElementById('quizView').classList.remove('hidden'); document.getElementById('quizView').classList.add('flex'); resetQuizView(); } };
+        window.renderFlashcardUI = function() { if (studyList.length === 0) { document.getElementById('fc-front').textContent = "Hết từ!"; document.getElementById('fc-pinyin').textContent = ""; document.getElementById('fc-meaning').textContent = "Bạn đã thuộc hết các từ trong bộ lọc này."; document.getElementById('fc-counter').textContent = "0 / 0"; return; } if (currentStudyIndex >= studyList.length) currentStudyIndex = 0; const word = studyList[currentStudyIndex]; isCardFlipped = false; document.querySelector('.card-container').classList.remove('flipped'); document.getElementById('fc-front').textContent = word.text; document.getElementById('fc-pinyin').innerHTML = `${word.pinyin||''} <div class="inline-flex flex-wrap items-center justify-center gap-1 align-middle ml-2">${word.pos ? word.pos.split(',').map(p => `<div class="relative group/tooltip inline-block"><span class="text-sm bg-white/20 px-2 py-0.5 rounded-md font-sans tracking-normal leading-none cursor-help hover:bg-white/30 transition-colors block">${p.trim().toLowerCase()}</span><div class="hidden group-hover/tooltip:block absolute top-full right-0 mt-1.5 bg-white text-black border border-gray-800 text-[14px] px-3 py-1.5 rounded shadow-md whitespace-nowrap z-[100] pointer-events-none font-sans font-normal">${window.getPosTooltip(p)}</div></div>`).join('') : ''}</div>`; document.getElementById('fc-meaning').textContent = word.meaning; document.getElementById('fc-counter').textContent = `${currentStudyIndex + 1} / ${studyList.length}`; const memBtn = document.getElementById('markMemorizedBtn'); if (word.memorized) { memBtn.className = "absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-12 h-12 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-green-600 transition btn-press border border-green-500"; } else { memBtn.className = "absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-12 h-12 bg-white text-gray-300 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition btn-press border border-gray-100"; } document.getElementById('openWriterBtn').onclick = (e) => { e.stopPropagation(); openAnimationModal(word); }; document.getElementById('speakBtn').onclick = (e) => { e.stopPropagation(); speakText(word.text); }; };
+        window.toggleMemorizedFlashcard = function(e) { e.stopPropagation(); if (studyList.length === 0) return; const word = studyList[currentStudyIndex]; word.memorized = !word.memorized; renderFlashcardUI(); updateStudyHeaderProgress(); const masterIdx = savedWords.findIndex(w => w.id === word.id); if(masterIdx !== -1) { savedWords[masterIdx].memorized = word.memorized; saveVocabToFirestore(); } if (isWeakFilterActive && word.memorized) { setTimeout(() => { refreshStudyList(); renderFlashcardUI(); }, 300); } };
+        window.flipCard = function() { if (studyList.length === 0) return; isCardFlipped = !isCardFlipped; document.querySelector('.card-container').classList.toggle('flipped'); };
+        window.nextCard = function() { if (studyList.length === 0) return; currentStudyIndex = (currentStudyIndex + 1) % studyList.length; renderFlashcardUI(); };
+        window.prevCard = function() { if (studyList.length === 0) return; currentStudyIndex = (currentStudyIndex - 1 + studyList.length) % studyList.length; renderFlashcardUI(); };
+        window.shuffleCards = function() { studyList.sort(() => Math.random() - 0.5); currentStudyIndex = 0; renderFlashcardUI(); };
+        window.renderStudyListView = function() { const container = document.getElementById('study-list-container'); container.innerHTML = ''; if (studyList.length === 0) { container.innerHTML = '<div class="text-center text-gray-400 py-10">Danh sách trống</div>'; renderPaginationControls(0); return; } const totalPages = Math.ceil(studyList.length / itemsPerPage); if (currentListPage > totalPages) currentListPage = totalPages || 1; if (currentListPage < 1) currentListPage = 1; const startIndex = (currentListPage - 1) * itemsPerPage; const paginatedItems = studyList.slice(startIndex, startIndex + itemsPerPage); paginatedItems.forEach(word => { const isMemorized = word.memorized || false; const div = document.createElement('div'); div.className = `bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between transition hover:shadow-md ${isMemorized ? 'bg-green-50/50' : ''}`; div.innerHTML = `<div class="flex items-center gap-4 flex-1 cursor-pointer" onclick="openAnimationModalFromID('${word.id}')"><div class="min-w-[3rem] w-auto px-2 py-1 h-12 rounded-lg bg-indigo-50 flex items-center justify-center text-2xl chinese-font text-indigo-600 text-center whitespace-nowrap border border-indigo-100">${word.text}</div><div class="flex-1 min-w-0"><div class="font-bold text-gray-800 text-lg leading-tight mb-1 break-words flex flex-wrap items-center gap-1"><span>${word.pinyin||''}</span>${word.pos ? word.pos.split(',').map(p => `<div class="relative group/tooltip inline-block"><span class="text-[11px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-bold border border-gray-200 tracking-wider inline-block leading-none cursor-help hover:bg-gray-200 transition-colors">${p.trim().toLowerCase()}</span><div class="hidden group-hover/tooltip:block absolute top-full right-0 mt-1 bg-white text-black border border-gray-800 text-[13px] px-2 py-1 rounded shadow-md whitespace-nowrap z-[100] pointer-events-none font-sans font-normal">${window.getPosTooltip(p)}</div></div>`).join('') : ''}</div><div class="text-sm text-gray-500 break-words">${word.meaning}</div></div></div><div class="flex items-center pl-2"><label class="cursor-pointer p-2"><input type="checkbox" class="w-6 h-6 rounded-md border-2 border-gray-300 custom-checkbox focus:ring-0 transition cursor-pointer text-indigo-600" ${isMemorized ? 'checked' : ''} onchange="handleListCheck(this, '${word.id}')"></label></div>`; container.appendChild(div); }); renderPaginationControls(totalPages); };
+        window.renderPaginationControls = function(totalPages) { const container = document.getElementById('study-pagination'); if (!container) return; if (totalPages <= 1) { container.innerHTML = ''; container.classList.add('hidden'); return; } container.classList.remove('hidden'); container.innerHTML = `<button onclick="changeStudyListPage(-1)" class="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 transition" ${currentListPage === 1 ? 'disabled class="w-8 h-8 rounded-full bg-gray-50 border border-gray-200 text-gray-300 flex items-center justify-center cursor-not-allowed"' : ''}><i class="fas fa-chevron-left"></i></button><span class="text-xs font-medium text-gray-500">Trang ${currentListPage} / ${totalPages}</span><button onclick="changeStudyListPage(1)" class="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 transition" ${currentListPage === totalPages ? 'disabled class="w-8 h-8 rounded-full bg-gray-50 border border-gray-200 text-gray-300 flex items-center justify-center cursor-not-allowed"' : ''}><i class="fas fa-chevron-right"></i></button>`; };
+        window.changeStudyListPage = function(diff) { currentListPage += diff; renderStudyListView(); document.querySelector('#listView').scrollTop = 0; };
+        window.handleListCheck = function(checkbox, id) { const word = studyList.find(w => w.id == id); if (!word) return; word.memorized = checkbox.checked; const masterIdx = savedWords.findIndex(w => w.id == id); if(masterIdx !== -1) { savedWords[masterIdx].memorized = checkbox.checked; saveVocabToFirestore(); } updateStudyHeaderProgress(); const row = checkbox.closest('div.bg-white'); if(word.memorized) row.classList.add('bg-green-50/50'); else row.classList.remove('bg-green-50/50'); if(isWeakFilterActive && word.memorized) { setTimeout(() => { refreshStudyList(); renderStudyListView(); }, 500); } };
+        window.openAnimationModalFromID = function(id) { const word = studyList.find(w => w.id == id) || savedWords.find(w => w.id == id); if (word) openAnimationModal(word); };
+        window.selectQuizCount = function(count) { selectedQuizCount = count; document.querySelectorAll('.quiz-count-btn').forEach(btn => { btn.classList.remove('bg-indigo-50', 'border-indigo-500', 'text-indigo-600'); if (btn.getAttribute('data-count') == count) { btn.classList.add('bg-indigo-50', 'border-indigo-500', 'text-indigo-600'); } }); };
+        
+        window.startQuiz = function() { 
+            if (studyList.length < 4) return window.showCustomModal("Cần ít nhất 4 từ vựng trong danh sách hiện tại để tạo bài kiểm tra!", "Chưa đủ từ", "warning"); 
+            let pool = [...studyList].sort(() => 0.5 - Math.random()); let limit = selectedQuizCount === 'all' ? pool.length : Math.min(parseInt(selectedQuizCount), pool.length); quizQuestions = []; for(let i=0; i<limit; i++) { const correct = pool[i]; const distractors = savedWords.filter(x => x.id !== correct.id).sort(() => 0.5 - Math.random()).slice(0, 3); while(distractors.length < 3) distractors.push(distractors[0]); let options = [correct, ...distractors].sort(() => 0.5 - Math.random()); quizQuestions.push({ question: correct, options: options, type: Math.random() > 0.5 ? 'pinyin' : 'meaning' }); } quizCurrentIndex = 0; quizScore = 0; document.getElementById('quizSetup').classList.add('hidden'); document.getElementById('quizResult').classList.add('hidden'); document.getElementById('quizResult').classList.remove('flex'); const activeDiv = document.getElementById('quizActive'); activeDiv.classList.remove('hidden'); activeDiv.classList.add('flex'); renderQuizQuestion(); 
+        };
+        
+        window.renderQuizQuestion = function() { isQuizAnswering = false; const q = quizQuestions[quizCurrentIndex]; document.getElementById('quizProgressText').textContent = `${quizCurrentIndex + 1}/${quizQuestions.length}`; document.getElementById('quizScoreText').textContent = `Điểm: ${quizScore}`; document.getElementById('quizProgressBar').style.width = `${(quizCurrentIndex / quizQuestions.length) * 100}%`; document.getElementById('quizQuestionLabel').textContent = q.type === 'pinyin' ? "Chọn Pinyin đúng" : "Chọn Nghĩa tiếng Việt"; document.getElementById('quizQuestionHanzi').textContent = q.question.text; const reveal = document.getElementById('quizQuestionReveal'); reveal.textContent = ''; reveal.classList.add('opacity-0'); const optionsDiv = document.getElementById('quizOptions'); optionsDiv.innerHTML = ''; q.options.forEach(opt => { const btn = document.createElement('button'); btn.className = "quiz-option w-full bg-white border-2 border-gray-100 p-4 rounded-xl text-center hover:border-indigo-200 hover:bg-indigo-50 active:scale-[0.98] btn-press relative overflow-hidden transition-all duration-200"; let content = q.type === 'pinyin' ? `<div class="font-bold text-gray-800 text-xl">${opt.pinyin}</div>` : `<div class="font-medium text-gray-800 text-lg">${opt.meaning}</div>`; btn.innerHTML = content; btn.onclick = () => handleQuizAnswer(btn, opt, q); optionsDiv.appendChild(btn); }); };
+        window.handleQuizAnswer = function(btn, selected, q) { if (isQuizAnswering) return; isQuizAnswering = true; const isCorrect = selected.id === q.question.id; const reveal = document.getElementById('quizQuestionReveal'); reveal.textContent = q.type === 'pinyin' ? q.question.meaning : q.question.pinyin; reveal.classList.remove('opacity-0'); if (isCorrect) { btn.classList.add('correct'); quizScore++; document.getElementById('quizScoreText').textContent = `Điểm: ${quizScore}`; } else { btn.classList.add('wrong'); const targetText = q.type === 'pinyin' ? q.question.pinyin : q.question.meaning; Array.from(document.getElementById('quizOptions').children).forEach(b => { if (b.innerText.includes(targetText)) b.classList.add('correct'); }); } setTimeout(() => { quizCurrentIndex++; if (quizCurrentIndex < quizQuestions.length) renderQuizQuestion(); else finishQuiz(); }, 1500); };
+        window.finishQuiz = function() { document.getElementById('quizActive').classList.add('hidden'); document.getElementById('quizActive').classList.remove('flex'); const res = document.getElementById('quizResult'); res.classList.remove('hidden'); res.classList.add('flex'); const percent = Math.round((quizScore / quizQuestions.length) * 100); const circle = document.getElementById('finalScoreCircle'); circle.textContent = `${percent}%`; document.getElementById('finalScoreDetail').textContent = `Bạn trả lời đúng ${quizScore}/${quizQuestions.length} câu`; if(percent >= 80) circle.className = "w-32 h-32 rounded-full bg-white border-8 border-green-100 flex items-center justify-center text-4xl font-bold text-green-600 shadow-sm mb-6"; else if(percent >= 50) circle.className = "w-32 h-32 rounded-full bg-white border-8 border-yellow-100 flex items-center justify-center text-4xl font-bold text-yellow-600 shadow-sm mb-6"; else circle.className = "w-32 h-32 rounded-full bg-white border-8 border-red-100 flex items-center justify-center text-4xl font-bold text-red-600 shadow-sm mb-6"; };
+        window.resetQuizView = function() { document.getElementById('quizResult').classList.add('hidden'); document.getElementById('quizResult').classList.remove('flex'); document.getElementById('quizActive').classList.add('hidden'); document.getElementById('quizActive').classList.remove('flex'); document.getElementById('quizSetup').classList.remove('hidden'); };
+        
+        window.confirmOpenBook = async function() {
+            closeOpenBookModal();
+            const id = document.getElementById('confirm-book-id').value;
+            const name = document.getElementById('confirm-book-name').textContent;
+            const fileName = document.getElementById('confirm-book-filename').value;
+            
+            if (unsubscribeVocab) { unsubscribeVocab(); unsubscribeVocab = null; } 
+            currentBookId = id; 
+            currentLocalFileName = fileName;
+            document.getElementById('current-book-name').textContent = name; 
+            setupFirestoreListener(id); 
+            
+            try {
+                showLoading(true, "Đang tải file từ máy tính...");
+                currentPdfData = await LocalFileStore.getPdf(fileName);
+                await openBookData(currentPdfData.slice(0), 1);
+            } catch (e) {
+                window.showCustomModal(`Không thể đọc file "${fileName}" từ thư mục đã chọn.\n\nNguyên nhân có thể do file đã bị xóa, bị đổi tên, hoặc bạn chưa cấp quyền thư mục.\n\nChi tiết lỗi: ${e.message}`, "Lỗi đọc file", "error");
+                document.getElementById("empty-state").classList.remove("hidden");
+                document.getElementById("canvas-wrapper").classList.add("hidden");
+                document.getElementById("tools-area").classList.add("hidden");
+                document.getElementById("left-sidebar").classList.add("hidden");
+            } finally {
+                showLoading(false);
+            }
+        };
+
+        window.exportToTxt = function() {
+            if (savedWords.length === 0) return window.showCustomModal("Danh sách đang trống!", "Lỗi xuất file", "warning");
+            const e="\ufeff"+savedWords.filter((e=>"done"===e.status)).map((e=>`${e.group||"Chung"}|${e.text}|${e.pinyin}|${e.meaning.replace(/(\r\n|\n|\r)/gm," ")}`)).join("\n"),t=new Blob([e],{type:"text/plain;charset=utf-8"}),n=URL.createObjectURL(t),o=document.createElement("a");o.href=n,o.download="TuVung.txt",document.body.appendChild(o),o.click(),document.body.removeChild(o)
+        };
+        
+        window.exportToJson = function() {
+            if (savedWords.length === 0 && savedBookmarks.length === 0) return window.showCustomModal("Dữ liệu đang trống!", "Lỗi xuất file", "warning");
+            const exportData = { version: 2, words: savedWords, bookmarks: savedBookmarks };
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `DuLieu_HocTap_${(new Date()).toLocaleDateString("vi-VN").replace(/\//g, "-")}.json`;
+            document.body.appendChild(a); 
+            a.click(); 
+            document.body.removeChild(a);
+        };
+
+        window.handleJsonUpload = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            e.target.value = "";
+            const reader = new FileReader();
+            reader.onload = async function(evt) {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    let importedWords = [];
+                    let importedBookmarks = [];
+
+                    if (Array.isArray(data)) {
+                        importedWords = data;
+                    } else if (data && typeof data === 'object') {
+                        importedWords = data.words || [];
+                        importedBookmarks = data.bookmarks || [];
+                    } else {
+                        return window.showCustomModal("File JSON không đúng định dạng.", "Lỗi định dạng", "error");
+                    }
+
+                    if (savedWords.length > 0 || savedBookmarks.length > 0) {
+                        const confirmMsg = `Tìm thấy ${importedWords.length} từ vựng và ${importedBookmarks.length} bookmark.\n\nNhấn "Đồng ý" để GỘP chung vào dữ liệu hiện tại.\nNhấn "Hủy bỏ" để XÓA CŨ và THAY THẾ toàn bộ.`;
+                        if (await window.showCustomModal(confirmMsg, "Tùy chọn nhập dữ liệu", "info", true)) {
+                            const mappedWords = importedWords.map((w, i) => ({ ...w, id: Date.now() + i + Math.floor(1e3 * Math.random()) }));
+                            savedWords = [...mappedWords, ...savedWords];
+                            function regenerateBookmarkIds(nodes) {
+                                return nodes.map(n => {
+                                    const newNode = { ...n, id: 'bm-' + Date.now() + Math.floor(Math.random() * 100000) };
+                                    if (newNode.children && newNode.children.length > 0) newNode.children = regenerateBookmarkIds(newNode.children);
+                                    return newNode;
+                                });
+                            }
+                            const mappedBookmarks = regenerateBookmarkIds(importedBookmarks);
+                            savedBookmarks = [...savedBookmarks, ...mappedBookmarks];
+                        } else {
+                            savedWords = importedWords;
+                            savedBookmarks = importedBookmarks;
+                        }
+                    } else {
+                        savedWords = importedWords;
+                        savedBookmarks = importedBookmarks;
+                    }
+
+                    renderList();
+                    renderBookmarkTree();
+                    saveVocabToFirestore(); 
+                    updateGroupFilterOptions();
+                    window.showCustomModal(`Đã nhập thành công ${importedWords.length} từ vựng và ${importedBookmarks.length} bookmark!`, "Thành công", "success");
+                } catch (err) {
+                    window.showCustomModal("Lỗi đọc file JSON: " + err.message, "Lỗi file", "error");
+                }
+            };
+            reader.readAsText(file);
+        };
+        
+        function generatePageNav(){const e=document.getElementById("page-list");e.innerHTML="";for(let t=1;t<=pdfDoc.numPages;t++){const n=document.createElement("div");n.className=`p-2 text-sm text-center cursor-pointer rounded hover:bg-indigo-50 border border-transparent hover:border-indigo-100 ${t===pageNum?"bg-indigo-100 font-bold text-indigo-700":"text-gray-600"}`,n.textContent=t,n.onclick=()=>{pageNum=t,renderPage(pageNum)},n.id=`nav-page-${t}`,e.appendChild(n)}}
+        function changeZoom(e){if(!pdfDoc)return;const t=pdfScale+e;t>=.5&&t<=5&&(pdfScale=t,document.getElementById("zoom-level").textContent=Math.round(100*pdfScale)+"%",renderPage(pageNum))}
+        function showLoading(e,t){const n=document.getElementById("loading-overlay");e?(document.getElementById("loading-text").textContent=t,n.classList.remove("hidden")):n.classList.add("hidden")}
+        
+        function handleFileUpload(e) {
+            const t = e.target.files[0];
+            if (!t) return;
+            currentLocalFileName = t.name; 
+            e.target.value = "";
+            const n = new FileReader();
+            n.onloadstart = () => showLoading(!0, "Đọc file...");
+            n.onload = async function() {
+                try {
+                    currentPdfData = this.result; 
+
+                    const e = "b_" + btoa(unescape(encodeURIComponent(t.name))).replace(/[\+\/=\s]/g, "");
+                    let n = sessionBooks.find((t => t.id === e));
+                    n ? n.data = this.result : (n = { id: e, name: t.name, data: this.result, vocab: [], bookmarks: [], pageNum: 1 }, sessionBooks.unshift(n));
+                    if (unsubscribeVocab) { unsubscribeVocab(); unsubscribeVocab = null; }
+                    currentBookId = e;
+                    document.getElementById("current-book-name").textContent = t.name;
+                    setupFirestoreListener(e);
+                    await openBookData(currentPdfData.slice(0), n.pageNum || 1);
+                    renderBookshelf();
+                } catch (e) {
+                    window.showCustomModal(e.message, "Lỗi đọc file", "error");
+                    showLoading(!1);
+                }
+            };
+            n.readAsArrayBuffer(t);
+        }
+        
+        async function openBookData(e,t){
+            try{
+                showLoading(!0,"Đang mở sách...");
+                pdfDoc=await pdfjsLib.getDocument(new Uint8Array(e)).promise;
+                pageNum=t;
+                document.getElementById("empty-state").classList.add("hidden");
+                document.getElementById("canvas-wrapper").classList.remove("hidden");
+                document.getElementById("tools-area").classList.remove("hidden");
+                document.getElementById("left-sidebar").classList.remove("hidden");
+                document.getElementById("left-sidebar").classList.add("flex");
+                document.getElementById("total-pages").textContent=pdfDoc.numPages;
+                generatePageNav();
+                await renderPage(pageNum);
+            } catch(e) {
+                window.showCustomModal("Lỗi tải PDF: "+e.message, "Lỗi", "error");
+            } finally {
+                showLoading(!1);
+            }
+        }
+        
+        async function renderPage(num){
+            if(!pdfDoc) return;
+            if (pageRendering) {
+                pageNumPending = num;
+                return;
+            }
+            pageRendering = true;
+
+            try {
+                const cv = document.getElementById("pdf-canvas");
+                const wp = document.getElementById("canvas-wrapper");
+                const p = await pdfDoc.getPage(num);
+                const vp = p.getViewport({scale:pdfScale});
+                
+                cv.width = vp.width;
+                cv.height = vp.height;
+                cv.style.width = Math.floor(vp.width)+"px";
+                cv.style.height = Math.floor(vp.height)+"px";
+                wp.style.width = Math.floor(vp.width)+"px";
+                wp.style.height = Math.floor(vp.height)+"px";
+                
+                const renderContext = {canvasContext: cv.getContext("2d"), viewport: vp};
+                await p.render(renderContext).promise;
+                
+                document.getElementById("page-input").value = pageNum;
+                updateBookmarkUI();
+                document.querySelectorAll("#page-list div").forEach(e => e.className = e.className.replace("bg-indigo-100 font-bold text-indigo-700", ""));
+                const active = document.getElementById(`nav-page-${pageNum}`);
+                if (active) {
+                    active.className += " bg-indigo-100 font-bold text-indigo-700";
+                    active.scrollIntoView({block:"center", behavior:"smooth"});
+                }
+                
+                // Vẽ highlight lên các từ đã lưu của trang này
+                if (window.drawSavedHighlights) window.drawSavedHighlights();
+
+            } catch (err) {
+                console.error("PDF Render Error: ", err);
+            } finally {
+                pageRendering = false;
+                if (pageNumPending !== null) {
+                    const nextNum = pageNumPending;
+                    pageNumPending = null;
+                    renderPage(nextNum);
+                }
+            }
+        }
+        
+        function toggleCaptureMode(){captureMode="read"===captureMode?"capture":"read";const e=document.getElementById("btn-capture"),t=document.getElementById("overlay"),n=document.getElementById("canvas-wrapper");"read"===captureMode?(t.style.display="none",n.style.cursor="default",e.innerHTML='<i class="fa-solid fa-crop-simple"></i> Đọc',e.className="px-3 py-1.5 rounded text-sm font-bold bg-white shadow text-gray-500 ring-2 ring-transparent transition-all hover:text-gray-700 flex items-center gap-1"):(t.style.display="block",n.style.cursor="crosshair",e.innerHTML='<i class="fa-solid fa-camera"></i> Đang chụp',e.className="px-3 py-1.5 rounded text-sm font-bold bg-red-50 text-red-600 shadow ring-2 ring-red-200 transition-all flex items-center gap-1"),t.innerHTML=""}
+        function setTranslationType(e,t,n){translationType=e,"word"===e?(t.classList.add("active"),n.classList.remove("active")):(t.classList.remove("active"),n.classList.add("active"))}
+        function handleStart(e){if("capture"!==captureMode)return;e.preventDefault();const t=getRelativeCoords(e);startX=t.x,startY=t.y,isDragging=!0;const n=document.createElement("div");n.id="current-selection",n.className="selection-box",n.style.left=startX+"px",n.style.top=startY+"px",document.getElementById("overlay").appendChild(n),"touchstart"===e.type?(window.addEventListener("touchmove",handleMove,{passive:!1}),window.addEventListener("touchend",handleEnd)):(window.addEventListener("mousemove",handleMove),window.addEventListener("mouseup",handleEnd))}
+        function handleMove(e){if(!isDragging)return;"touchmove"===e.type&&e.preventDefault();const t=getRelativeCoords(e),n=document.getElementById("canvas-wrapper"),o=Math.max(0,Math.min(t.x,n.offsetWidth)),a=Math.max(0,Math.min(t.y,n.offsetHeight)),i=document.getElementById("current-selection");i&&(i.style.width=Math.abs(o-startX)+"px",i.style.height=Math.abs(a-startY)+"px",i.style.left=Math.min(o,startX)+"px",i.style.top=Math.min(a,startY)+"px")}
+        function handleEnd(e){if(!isDragging)return;isDragging=!1,window.removeEventListener("mousemove",handleMove),window.removeEventListener("mouseup",handleEnd),window.removeEventListener("touchmove",handleMove),window.removeEventListener("touchend",handleEnd);const t=document.getElementById("current-selection");if(!t)return;const n=parseFloat(t.style.width),o=parseFloat(t.style.height),a=parseFloat(t.style.left),i=parseFloat(t.style.top);if(t.remove(),n>5&&o>5){if(!pdfDoc)return window.showCustomModal("Vui lòng tải sách lên trước khi quét!", "Thông báo", "warning");const e=captureImage(a,i,n,o),t=Date.now()+Math.floor(1e3*Math.random()),r=document.getElementById("canvas-wrapper"),s={x:a/r.offsetWidth,y:i/r.offsetHeight,w:n/r.offsetWidth,h:o/r.offsetHeight},c="all"!==currentGroupFilter?currentGroupFilter:"Chung",d={id:t,status:"processing",text:"",pinyin:"",meaning:"",pos:"",type:translationType,page:pageNum,rect:s,group:c,timestamp:(new Date).toLocaleDateString("vi-VN")};savedWords.unshift(d),renderList(),saveVocabToFirestore(),processQueueItem(t,e,translationType)}}
+        function getRelativeCoords(e){const t=document.getElementById("canvas-wrapper").getBoundingClientRect();let n=e.touches?e.touches[0].clientX:e.clientX,o=e.touches?e.touches[0].clientY:e.clientY;return{x:n-t.left,y:o-t.top}}
+        function captureImage(e,t,n,o){const a=document.getElementById("pdf-canvas"),i=a.width/a.offsetWidth,r=a.height/a.offsetHeight,s=document.createElement("canvas"),c=Math.min(a.width-e*i,n*i+20),d=Math.min(a.height-t*r,o*r+20);s.width=c,s.height=d;const l=s.getContext("2d");l.drawImage(a,Math.max(0,e*i-10),Math.max(0,t*r-10),c,d,0,0,c,d);const m=l.getImageData(0,0,c,d),u=m.data;let g=0;for(let e=0;e<u.length;e+=4)g+=.299*u[e]+.587*u[e+1]+.114*u[e+2];const p=g/(c*d)<130;for(let e=0;e<u.length;e+=4){let t=u[e];t=p?t>100?0:255:t<160?0:255,u[e]=u[e+1]=u[e+2]=t}return l.putImageData(m,0,0),s.toDataURL("image/png")}
+        async function processQueueItem(e,t,n){try{const{data:{text:o}}=await Tesseract.recognize(t,"chi_sim");let a=o.replace(/\s+/g,"").trim();if("word"===n){const e=a.match(/[\u4E00-\u9FFF]+/g);a=e?e.join(""):a.replace(/[|_\-~^°`"'.,;!?@#$%^&*()\[\]{}+=<>\\/]/g,"")}else a=o.replace(/\n/g," ").replace(/\s+/g," ").trim().replace(/^[|_]+|[|_]+$/g,"").replace(/([\u4E00-\u9FFF])\s+([\u4E00-\u9FFF])/g,"$1$2");if(!a)throw new Error("Empty");const i=savedWords.find((t=>t.id===e));i&&(i.text=a,renderItemStatus(e,a,"Đang dịch..."),saveVocabToFirestore(),await callGemini(e,a,n))}catch(t){const n=savedWords.find((t=>t.id===e));n&&(n.status="error",n.meaning="Lỗi nhận diện",renderList(),saveVocabToFirestore())}}
+        window.highlightWord=async function(e){const t=savedWords.find((t=>t.id===e));if(!t)return;pageNum!==t.page&&(pageNum=t.page,await renderPage(pageNum));if(t.rect){const e=document.getElementById("canvas-wrapper");document.querySelectorAll(".smart-trace-highlight").forEach((e=>e.remove()));const n=document.createElement("div");n.className="smart-trace-highlight",n.style.position="absolute",n.style.left=t.rect.x*e.offsetWidth+"px",n.style.top=t.rect.y*e.offsetHeight+"px",n.style.width=t.rect.w*e.offsetWidth+"px",n.style.height=t.rect.h*e.offsetHeight+"px",n.style.border="2px solid #ef4444",n.style.zIndex="100",n.style.pointerEvents="none",e.appendChild(n),n.scrollIntoView({behavior:"smooth",block:"center"}),setTimeout((()=>n.remove()),2500)}};
+
+        // ==========================================
+        // KHU VỰC SỬA LỖI: BỔ SUNG HÀM TẬP VIẾT 
+        // ==========================================
+        
+        window.openAnimationModal = function(word) {
+            if (!word || !word.text) return;
+
+            // Lọc chỉ lấy Hán Tự (bỏ qua dấu câu, chữ latin...)
+            const chineseChars = word.text.match(/[\u4E00-\u9FFF]/g) || [];
+            if (chineseChars.length === 0) {
+                window.showCustomModal("Không tìm thấy Hán tự nào để tập viết!", "Thông báo", "warning");
+                return;
+            }
+
+            animationCharacters = chineseChars;
+            document.getElementById('animationPinyin').textContent = word.pinyin || '---';
+            document.getElementById('animationMeaning').textContent = word.meaning || '---';
+
+            const tabsContainer = document.getElementById('characterTabs');
+            tabsContainer.innerHTML = '';
+
+            // Tạo các tab cho từng chữ cái trong từ
+            animationCharacters.forEach((char, index) => {
+                const btn = document.createElement('button');
+                btn.className = `w-10 h-10 rounded-lg font-kaiti text-xl border-2 transition-all ${index === 0 ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'}`;
+                btn.textContent = char;
+                btn.onclick = () => window.renderCharacterTab(index, btn);
+                tabsContainer.appendChild(btn);
+            });
+
+            const modal = document.getElementById('animationModal');
+            const content = document.getElementById('animationModalContent');
+            modal.classList.remove('hidden');
+            
+            // Animation mở modal
+            requestAnimationFrame(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            });
+
+            // Mặc định render chữ đầu tiên
+            window.renderCharacterTab(0, tabsContainer.firstChild);
+        };
+
+        window.renderCharacterTab = function(index, activeBtn) {
+            // Cập nhật giao diện tab đang active
+            const tabs = document.getElementById('characterTabs').children;
+            for (let btn of tabs) {
+                btn.className = 'w-10 h-10 rounded-lg font-kaiti text-xl border-2 transition-all bg-white border-gray-200 text-gray-600 hover:border-indigo-300';
+            }
+            if (activeBtn) {
+                activeBtn.className = 'w-10 h-10 rounded-lg font-kaiti text-xl border-2 transition-all bg-indigo-100 border-indigo-500 text-indigo-700 font-bold';
+            }
+
+            const target = document.getElementById('animationTarget');
+            target.innerHTML = ''; // Xóa chữ cũ
+
+            const char = animationCharacters[index];
+            if (!char) return;
+
+            // Khởi tạo thư viện Hanzi Writer
+            animationWriter = HanziWriter.create('animationTarget', char, {
+                width: 250,
+                height: 250,
+                padding: 10,
+                strokeAnimationSpeed: 1.5,
+                delayBetweenStrokes: 150,
+                strokeColor: '#4f46e5', // Màu chàm (indigo-600)
+                radialColor: '#e0e7ff', 
+                showOutline: true,
+                outlineColor: '#f3f4f6', 
+            });
+
+            // Tự động chạy animation sau khi render
+            setTimeout(() => {
+                if (animationWriter) animationWriter.animateCharacter();
+            }, 300);
+        };
+
+        // Sự kiện Đóng Modal Tập Viết
+        document.getElementById('closeAnimationModal').addEventListener('click', () => {
+            const modal = document.getElementById('animationModal');
+            const content = document.getElementById('animationModalContent');
+            
+            modal.classList.add('opacity-0');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+            
+            if (animationWriter) {
+                animationWriter.cancelQuiz(); // Dừng animation nếu đang chạy
+            }
+        });
+
+        // Sự kiện Nút "Viết lại"
+        document.getElementById('animateActionBtn').addEventListener('click', () => {
+            if (animationWriter) {
+                animationWriter.animateCharacter();
+            }
+        });
+
+    </script>
+</body>
+</html>
